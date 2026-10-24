@@ -191,13 +191,11 @@ private fun DyNavHost(
                     isFavorite = isFavorite,
                     onToggleFavorite = vm::toggleFavorite,
                     onShareResult = {
-                        result?.let { obj ->
-                            // 按平台标注来源
-                            val platform = if (obj.optString("platform", "") == "xhs") "小红书" else "抖音"
+                        result?.let { media ->
                             val text = buildString {
-                                append("【$platform】${obj.optString("title", "(无标题)")}\n")
-                                append("作者:@${obj.optString("author", "")}\n")
-                                append("ID:${obj.optString("aweme_id", "")}")
+                                append("【${media.platform.displayName}】${media.title}\n")
+                                append("作者:@${media.author}\n")
+                                append("ID:${media.id}")
                             }
                             val share = Intent(Intent.ACTION_SEND).apply {
                                 type = "text/plain"

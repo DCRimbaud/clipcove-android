@@ -51,8 +51,9 @@ import com.douyin.core.designsystem.DyInput
 import com.douyin.core.designsystem.DyRed
 import com.douyin.core.designsystem.DyText
 import com.douyin.core.designsystem.DyTextSecondary
+import com.douyin.core.model.MediaImage
+import com.douyin.core.model.MediaInfo
 import com.douyin.data.history.HistoryItem
-import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Date
 /** 首页入口:接收 ViewModel 状态,渲染完整首页 */
@@ -63,7 +64,7 @@ fun HomeScreen(
     onParse: () -> Unit,
     loading: Boolean,
     error: String,
-    result: JSONObject?,
+    result: MediaInfo?,
     history: List<HistoryItem>,
     onDownload: (String, String, String) -> Unit,
     onMerge: (String, String, String) -> Unit,
@@ -171,7 +172,7 @@ fun HomeScreen(
                         )
                     ) {
                         ResultCard(
-                            obj = it,
+                            media = it,
                             onDownload = onDownload,
                             onMerge = onMerge,
                             isFavorite = isFavorite,
@@ -241,12 +242,10 @@ fun HomeScreen(
     }
 }
 
-private data class ImageItem(val url: String, val originalUrl: String, val gifUrl: String)
-
 /** 图集全屏查看器:左右滑动浏览 */
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-private fun FullscreenImagePager(images: List<ImageItem>, initialIndex: Int, onDismiss: () -> Unit) {
+private fun FullscreenImagePager(images: List<MediaImage>, initialIndex: Int, onDismiss: () -> Unit) {
     val pagerState = rememberPagerState(initialPage = initialIndex) { images.size }
     Dialog(onDismissRequest = onDismiss) {
         Box(
@@ -315,26 +314,19 @@ private fun FullscreenVideoDialog(url: String, onDismiss: () -> Unit) {
 
 @Composable
 private fun ResultCard(
-    obj: JSONObject,
+    media: MediaInfo,
     onDownload: (String, String, String) -> Unit,
     onMerge: (String, String, String) -> Unit,
     isFavorite: Boolean = false,
     onToggleFavorite: () -> Unit = {},
     onShare: () -> Unit = {}
 ) {
-    val playUrl = obj.optString("play_url", "")
-    val musicUrl = obj.optString("music", "")
-    val awemeId = obj.optString("aweme_id", "")
-    val title = obj.optString("title", "视频 $awemeId").ifBlank { "视频 $awemeId" }
-    val images = (0 until (obj.optJSONArray("images")?.length() ?: 0)).map { i ->
-        val it = obj.optJSONArray("images")!!.getJSONObject(i)
-        ImageItem(
-            it.optString("url", ""),
-            it.optString("original_url", ""),
-            it.optString("gif_url", "")
-        )
-    }
-    val stats = obj.optJSONObject("stats") ?: JSONObject()
+    val playUrl = media.videoUrl
+    val musicUrl = media.musicUrl
+    val awemeId = media.id
+    val title = media.title.ifBlank { "媒体 $awemeId" }
+    val images = media.images
+    val stats = media.stats
     val context = LocalContext.current
 
     // 全屏查看器状态
@@ -361,7 +353,7 @@ private fun ResultCard(
         border = BorderStroke(1.dp, DyInput)
     ) {
         Column(Modifier.padding(12.dp)) {
-            val cover = obj.optString("cover", "")
+            val cover = media.coverUrl
             if (cover.isNotEmpty()) {
                 AsyncImage(
                     model = cover,
@@ -394,21 +386,21 @@ private fun ResultCard(
                 }
             }
             Spacer(Modifier.height(10.dp))
-            Text(obj.optString("title", "(无标题)"), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = DyText)
+            Text(media.title, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = DyText)
             Spacer(Modifier.height(4.dp))
-            Text("@" + obj.optString("author", ""), fontSize = 14.sp, color = DyCyan)
+            Text("@" + media.author, fontSize = 14.sp, color = DyCyan)
             Spacer(Modifier.height(4.dp))
-            val secs = obj.optLong("duration", 0) / 1000
+            val secs = media.durationMs / 1000
             Text(
                 "时长 ${secs / 60}:${String.format("%02d", secs % 60)}" +
-                    " | 点赞 ${stats.optLong("digg_count", 0)}" +
-                    " | 评论 ${stats.optLong("comment_count", 0)}" +
-                    " | 收藏 ${stats.optLong("collect_count", 0)}",
+                    " | 点赞 ${stats.diggCount}" +
+                    " | 评论 ${stats.commentCount}" +
+                    " | 收藏 ${stats.collectCount}",
                 fontSize = 12.sp, color = DyTextSecondary
             )
             // 发布时间 + 音乐名
-            val createTime = obj.optLong("create_time", 0)
-            val musicTitle = obj.optString("music_title", "")
+            val createTime = media.createdAtSeconds
+            val musicTitle = media.musicTitle
             if (createTime > 0 || musicTitle.isNotEmpty()) {
                 Spacer(Modifier.height(4.dp))
                 Text(
@@ -485,15 +477,15 @@ private fun ResultCard(
                         .clickable { fullscreenImageIndex = i },
                     contentScale = ContentScale.Crop
                 )
-                if (img.gifUrl.isNotEmpty()) {
+                if (img.livePhotoUrl.isNotEmpty()) {
                     Spacer(Modifier.height(8.dp))
                     ActionButton("下载动图 ${i + 1}", DyGreen) {
-                        onDownload("动图 ${i + 1}", "${awemeId}_${i + 1}_动图.mp4", img.gifUrl)
+                        onDownload("动图 ${i + 1}", "${awemeId}_${i + 1}_动图.mp4", img.livePhotoUrl)
                     }
                     if (musicUrl.isNotEmpty()) {
                         Spacer(Modifier.height(8.dp))
                         ActionButton("动图+音乐 合成 ${i + 1}", DyAmber) {
-                            onMerge(img.gifUrl, musicUrl, "${awemeId}_${i + 1}_合并.mp4")
+                            onMerge(img.livePhotoUrl, musicUrl, "${awemeId}_${i + 1}_合并.mp4")
                         }
                     }
                 } else {

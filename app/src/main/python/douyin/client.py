@@ -16,6 +16,16 @@ DETAIL_URL = "https://www.douyin.com/aweme/v1/web/aweme/detail/"
 # 当前网关只检查请求头存在，不需要登录 Cookie。
 ARGUS_HEADERS = {"x-tt-argus": "1"}
 
+
+class DouyinApiError(RuntimeError):
+    """带稳定错误码的平台异常，供 Kotlin 层映射为用户可操作状态。"""
+
+    def __init__(self, code: str, message: str, debug_detail: str = ""):
+        super().__init__(message)
+        self.code = code
+        self.debug_detail = debug_detail[:500]
+
+
 # 与 abogus 签名对应的浏览器参数集(改动需与 UA 保持一致)
 BASE_PARAMS = {
     "device_platform": "webapp",
@@ -131,15 +141,78 @@ class DouyinClient:
         url = self._signed_url(aweme_id)
         for attempt in range(3):
             resp = self.session.get(url, timeout=self.timeout)
-            data = resp.json()
+            body = resp.text or ""
+            if resp.status_code != 200:
+                if resp.status_code in (401, 403, 412, 429) or "ArgusSecurityPlugin" in body:
+                    raise DouyinApiError(
+                        "RISK_CONTROL",
+                        "抖音触发了访问风控，请稍后重试",
+                        f"HTTP {resp.status_code}: {body[:300]}",
+                    )
+                if resp.status_code in (404, 410):
+                    raise DouyinApiError(
+                        "CONTENT_UNAVAILABLE",
+                        "作品不存在、已删除或当前不可见",
+                        f"HTTP {resp.status_code}",
+                    )
+                if resp.status_code >= 500:
+                    raise DouyinApiError(
+                        "NETWORK",
+                        "抖音服务暂时不可用，请稍后重试",
+                        f"HTTP {resp.status_code}",
+                    )
+                raise DouyinApiError(
+                    "RESPONSE_CHANGED",
+                    f"抖音接口返回异常（HTTP {resp.status_code}）",
+                    body[:300],
+                )
+
+            try:
+                data = resp.json()
+            except ValueError as exc:
+                raise DouyinApiError(
+                    "RESPONSE_CHANGED",
+                    "抖音接口返回了无法识别的内容",
+                    body[:300],
+                ) from exc
+
             if data.get("status_code") in (0, None) and data.get("aweme_detail"):
                 return data["aweme_detail"]
+
             if data.get("status_code") in (5, 404, 2054) and attempt < 2:
                 time.sleep(1 + attempt)
                 url = self._signed_url(aweme_id)
                 continue
-            raise RuntimeError(f"接口返回异常: status_code={data.get('status_code')} message={data.get('status_msg')}")
-        raise RuntimeError("获取详情失败")
+
+            filter_detail = data.get("filter_detail") or {}
+            filter_message = filter_detail.get("detail_msg") or filter_detail.get("notice") or ""
+            if filter_message:
+                raise DouyinApiError(
+                    "CONTENT_UNAVAILABLE",
+                    str(filter_message),
+                    str(filter_detail)[:300],
+                )
+
+            status_code = data.get("status_code")
+            status_message = str(data.get("status_msg") or "").strip()
+            if status_code == 2054:
+                raise DouyinApiError(
+                    "CONTENT_UNAVAILABLE",
+                    status_message or "作品当前不可见",
+                    f"status_code={status_code}",
+                )
+            if status_code == 5:
+                raise DouyinApiError(
+                    "NETWORK",
+                    "抖音服务暂时不可用，请稍后重试",
+                    f"status_code={status_code} message={status_message}",
+                )
+            raise DouyinApiError(
+                "RESPONSE_CHANGED",
+                status_message or "抖音接口返回异常",
+                f"status_code={status_code}",
+            )
+        raise DouyinApiError("NETWORK", "获取抖音详情失败，请稍后重试")
 
     def extract_video(self, detail: dict) -> dict:
         """从详情数据中提取无水印视频直链等核心信息。
@@ -194,7 +267,7 @@ class DouyinClient:
                     {"label": f"bitrate_{i}", "url": pa["url_list"][0], "bitrate": br.get("bit_rate")}
                 )
         if not candidates:
-            raise RuntimeError("未找到可用的视频地址")
+            raise DouyinApiError("RESPONSE_CHANGED", "未找到可用的视频地址")
         best = max(candidates, key=lambda c: c.get("bitrate") or 0)
         return {
             "aweme_id": str(detail.get("aweme_id")),

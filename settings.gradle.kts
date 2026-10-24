@@ -19,6 +19,7 @@ dependencyResolutionManagement {
 }
 rootProject.name = "DouyinParser"
 include(":app")
+include(":core:model")
 include(":core:designsystem")
 include(":core:common")
 include(":data:douyin")

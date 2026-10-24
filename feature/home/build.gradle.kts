@@ -14,6 +14,7 @@ android {
     composeOptions { kotlinCompilerExtensionVersion = "1.5.14" }
 }
 dependencies {
+    implementation(project(":core:model"))
     implementation(project(":core:designsystem"))
     implementation(project(":core:common"))
     implementation(project(":data:douyin"))
