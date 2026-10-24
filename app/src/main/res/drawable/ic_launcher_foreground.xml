@@ -12,7 +12,7 @@
     android:viewportHeight="108">
     <!-- 红色圆形 -->
     <path
-        android:fillColor="#FE2C55"
+        android:fillColor="#FF466C"
         android:pathData="M54,22 a32,32 0 1 1 -0.01,0 z" />
     <!-- 白色播放三角:高 38,宽 34,中心(54,54) -->
     <path

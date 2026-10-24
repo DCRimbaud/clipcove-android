@@ -73,6 +73,16 @@ class HomeViewModel(
         }
     }
 
+    fun pasteClipboard() {
+        val app = getApplication<Application>()
+        val clipboard = app.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val text = clipboard.primaryClip?.getItemAt(0)?.coerceToText(app)?.toString()?.trim()
+        if (!text.isNullOrBlank()) {
+            _input.value = text.take(MAX_INPUT_LENGTH)
+            _error.value = null
+        }
+    }
+
     fun checkClipboard() {
         val app = getApplication<Application>()
         val clipboard = app.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager

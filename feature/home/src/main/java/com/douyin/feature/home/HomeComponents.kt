@@ -4,17 +4,56 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
@@ -32,89 +71,24 @@ import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
-import com.douyin.core.designsystem.DyAmber
+import com.douyin.core.designsystem.DyBorder
 import com.douyin.core.designsystem.DyCard
 import com.douyin.core.designsystem.DyCyan
 import com.douyin.core.designsystem.DyGreen
+import com.douyin.core.designsystem.DyIconTile
 import com.douyin.core.designsystem.DyInput
+import com.douyin.core.designsystem.DyPill
 import com.douyin.core.designsystem.DyRed
+import com.douyin.core.designsystem.DySurfaceHigh
 import com.douyin.core.designsystem.DyText
 import com.douyin.core.designsystem.DyTextSecondary
 import com.douyin.core.model.MediaImage
 import com.douyin.core.model.MediaInfo
+import com.douyin.core.model.MediaPlatform
+import com.douyin.core.model.MediaStats
 import com.douyin.data.history.HistoryItem
 import java.text.SimpleDateFormat
 import java.util.Date
-
-/** 图集全屏查看器:左右滑动浏览 */
-@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
-@Composable
-private fun FullscreenImagePager(images: List<MediaImage>, initialIndex: Int, onDismiss: () -> Unit) {
-    val pagerState = rememberPagerState(initialPage = initialIndex) { images.size }
-    Dialog(onDismissRequest = onDismiss) {
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(Color.Black)
-        ) {
-            HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    AsyncImage(
-                        model = images[page].url,
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Fit
-                    )
-                }
-            }
-            // 页码 + 关闭
-            Text(
-                "${pagerState.currentPage + 1} / ${images.size}",
-                fontSize = 14.sp,
-                color = Color.White,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 24.dp)
-            )
-            Text(
-                "✕ 关闭",
-                fontSize = 14.sp,
-                color = Color.White,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(16.dp)
-                    .background(Color(0x88000000), RoundedCornerShape(6.dp))
-                    .padding(horizontal = 10.dp, vertical = 6.dp)
-                    .clickable { onDismiss() }
-            )
-        }
-    }
-}
-
-/** 视频全屏播放器(横屏) */
-@Composable
-private fun FullscreenVideoDialog(url: String, onDismiss: () -> Unit) {
-    Dialog(onDismissRequest = onDismiss) {
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(Color.Black)
-        ) {
-            ExoPlayerPreview(url, Modifier.fillMaxSize())
-            Text(
-                "✕ 退出全屏",
-                fontSize = 14.sp,
-                color = Color.White,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(16.dp)
-                    .background(Color(0x88000000), RoundedCornerShape(6.dp))
-                    .padding(horizontal = 10.dp, vertical = 6.dp)
-                    .clickable { onDismiss() }
-            )
-        }
-    }
-}
 
 @Composable
 internal fun ResultCard(
@@ -123,196 +97,422 @@ internal fun ResultCard(
     onMerge: (String, String, String) -> Unit,
     isFavorite: Boolean = false,
     onToggleFavorite: () -> Unit = {},
-    onShare: () -> Unit = {}
+    onShare: () -> Unit = {},
 ) {
-    val playUrl = media.videoUrl
-    val musicUrl = media.musicUrl
-    val awemeId = media.id
-    val title = media.title.ifBlank { "媒体 $awemeId" }
-    val images = media.images
-    val stats = media.stats
     val context = LocalContext.current
-
-    // 全屏查看器状态
-    var fullscreenImageIndex by remember { mutableStateOf(-1) }
+    var fullscreenImageIndex by remember { mutableIntStateOf(-1) }
     var fullscreenVideo by remember { mutableStateOf(false) }
+    val favoriteScale = remember { Animatable(1f) }
+    val platformColor = if (media.platform == MediaPlatform.XIAOHONGSHU) DyRed else DyCyan
+    val title = media.title.ifBlank { "媒体 ${media.id}" }
 
     if (fullscreenImageIndex >= 0) {
-        FullscreenImagePager(images, fullscreenImageIndex) {
+        FullscreenImagePager(media.images, fullscreenImageIndex) {
             fullscreenImageIndex = -1
         }
     }
     if (fullscreenVideo) {
-        FullscreenVideoDialog(url = playUrl, onDismiss = {
+        FullscreenVideoDialog(media.videoUrl) {
             fullscreenVideo = false
             (context as? android.app.Activity)?.requestedOrientation =
                 android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-        })
+        }
+    }
+    LaunchedEffect(isFavorite) {
+        if (isFavorite) {
+            favoriteScale.snapTo(0.75f)
+            favoriteScale.animateTo(1.18f, spring(dampingRatio = Spring.DampingRatioMediumBouncy))
+            favoriteScale.animateTo(1f, spring(dampingRatio = Spring.DampingRatioNoBouncy))
+        }
     }
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(24.dp),
         color = DyCard,
-        border = BorderStroke(1.dp, DyInput)
+        border = BorderStroke(1.dp, DyBorder.copy(alpha = 0.78f)),
     ) {
-        Column(Modifier.padding(12.dp)) {
-            val cover = media.coverUrl
-            if (cover.isNotEmpty()) {
-                AsyncImage(
-                    model = cover,
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxWidth().height(200.dp).clip(RoundedCornerShape(12.dp)),
-                    contentScale = ContentScale.Crop
-                )
-            }
-            if (playUrl.isNotEmpty()) {
-                Spacer(Modifier.height(8.dp))
-                Box(Modifier.fillMaxWidth().height(220.dp).clip(RoundedCornerShape(12.dp))) {
-                    // 全屏打开时暂停内嵌播放器,避免双播放器并行
-                    ExoPlayerPreview(playUrl, Modifier.fillMaxSize(), active = !fullscreenVideo)
-                    // 全屏按钮浮层:PlayerView 会消费触摸,需独立可点击元素
-                    Text(
-                        "⛶ 全屏",
-                        fontSize = 12.sp,
-                        color = Color.White,
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(8.dp)
-                            .background(Color(0x88000000), RoundedCornerShape(6.dp))
-                            .padding(horizontal = 10.dp, vertical = 6.dp)
-                            .clickable {
-                                fullscreenVideo = true
-                                (context as? android.app.Activity)?.requestedOrientation =
-                                    android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-                            }
-                    )
-                }
-            }
-            Spacer(Modifier.height(10.dp))
-            Text(media.title, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = DyText)
-            Spacer(Modifier.height(4.dp))
-            Text("@" + media.author, fontSize = 14.sp, color = DyCyan)
-            Spacer(Modifier.height(4.dp))
-            val secs = media.durationMs / 1000
-            Text(
-                "时长 ${secs / 60}:${String.format("%02d", secs % 60)}" +
-                    " | 点赞 ${stats.diggCount}" +
-                    " | 评论 ${stats.commentCount}" +
-                    " | 收藏 ${stats.collectCount}",
-                fontSize = 12.sp, color = DyTextSecondary
+        Column {
+            MediaPreview(
+                media = media,
+                platformColor = platformColor,
+                onFullscreenVideo = {
+                    fullscreenVideo = true
+                    (context as? android.app.Activity)?.requestedOrientation =
+                        android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                },
+                onOpenImage = { fullscreenImageIndex = it },
             )
-            // 发布时间 + 音乐名
-            val createTime = media.createdAtSeconds
-            val musicTitle = media.musicTitle
-            if (createTime > 0 || musicTitle.isNotEmpty()) {
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    buildString {
-                        if (createTime > 0) {
-                            append("发布于 ")
-                            append(SimpleDateFormat("yyyy-MM-dd HH:mm").format(Date(createTime * 1000)))
-                        }
-                        if (musicTitle.isNotEmpty()) {
-                            if (isNotEmpty()) append("  |  ")
-                            append("音乐:$musicTitle")
-                        }
-                    },
-                    fontSize = 12.sp, color = DyTextSecondary
-                )
-            }
-            Spacer(Modifier.height(10.dp))
-            // 收藏 + 分享(收藏时心形弹跳)
-            val favScale = remember { Animatable(1f) }
-            LaunchedEffect(isFavorite) {
-                if (isFavorite) {
-                    favScale.snapTo(0.5f)
-                    favScale.animateTo(1.3f, spring(dampingRatio = Spring.DampingRatioMediumBouncy))
-                    favScale.animateTo(1f, spring(dampingRatio = Spring.DampingRatioNoBouncy))
-                }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedButton(
-                    onClick = onToggleFavorite,
-                    modifier = Modifier.weight(1f).height(44.dp),
-                    shape = RoundedCornerShape(22.dp),
-                    border = BorderStroke(1.dp, if (isFavorite) DyRed else DyInput)
+
+            Column(Modifier.padding(16.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Text(
-                        if (isFavorite) "♥ 已收藏" else "♡ 收藏",
-                        fontSize = 14.sp,
-                        color = if (isFavorite) DyRed else DyText,
-                        modifier = Modifier.graphicsLayer {
-                            scaleX = favScale.value
-                            scaleY = favScale.value
-                        }
+                    DyPill(media.platform.displayName, platformColor)
+                    DyPill(if (media.hasVideo) "视频" else "图集", DyTextSecondary)
+                    if (media.durationMs > 0) {
+                        Text(
+                            formatDuration(media.durationMs),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = DyTextSecondary,
+                        )
+                    }
+                    Spacer(Modifier.weight(1f))
+                    if (media.createdAtSeconds > 0) {
+                        Text(
+                            SimpleDateFormat("MM-dd HH:mm", java.util.Locale.CHINA)
+                                .format(Date(media.createdAtSeconds * 1000)),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = DyTextSecondary,
+                        )
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = DyText,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (media.author.isNotBlank()) {
+                    Spacer(Modifier.height(5.dp))
+                    Text("@${media.author}", style = MaterialTheme.typography.bodyMedium, color = platformColor)
+                }
+                if (media.stats.hasAnyValue()) {
+                    Spacer(Modifier.height(12.dp))
+                    StatsRow(media.stats)
+                }
+                Spacer(Modifier.height(14.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedButton(
+                        onClick = onToggleFavorite,
+                        modifier = Modifier.weight(1f).height(44.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        border = BorderStroke(1.dp, if (isFavorite) DyRed.copy(alpha = 0.7f) else DyBorder),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = if (isFavorite) DyRed.copy(alpha = 0.08f) else Color.Transparent,
+                        ),
+                    ) {
+                        Icon(
+                            if (isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                            contentDescription = null,
+                            tint = if (isFavorite) DyRed else DyTextSecondary,
+                            modifier = Modifier
+                                .size(18.dp)
+                                .graphicsLayer {
+                                    scaleX = favoriteScale.value
+                                    scaleY = favoriteScale.value
+                                },
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(if (isFavorite) "已收藏" else "收藏", color = if (isFavorite) DyRed else DyText)
+                    }
+                    OutlinedButton(
+                        onClick = onShare,
+                        modifier = Modifier.weight(1f).height(44.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        border = BorderStroke(1.dp, DyBorder),
+                    ) {
+                        Icon(Icons.Filled.Share, contentDescription = null, tint = DyTextSecondary, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("分享", color = DyText)
+                    }
+                }
+                if (media.videoUrl.isNotBlank()) {
+                    Spacer(Modifier.height(10.dp))
+                    Button(
+                        onClick = { onDownload(title, safeFilename(title, "mp4"), media.videoUrl) },
+                        modifier = Modifier.fillMaxWidth().height(50.dp),
+                        shape = RoundedCornerShape(15.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = DyRed),
+                    ) {
+                        Icon(Icons.Filled.Download, contentDescription = null, modifier = Modifier.size(19.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("下载无水印视频", fontWeight = FontWeight.SemiBold)
+                    }
+                }
+                if (media.musicUrl.isNotBlank()) {
+                    Spacer(Modifier.height(10.dp))
+                    MusicDownloadRow(
+                        title = media.musicTitle.ifBlank { "原声" },
+                        onDownload = {
+                            onDownload(
+                                "音乐 $title",
+                                safeFilename("$title-原声", "mp3"),
+                                media.musicUrl,
+                            )
+                        },
                     )
                 }
-                OutlinedButton(
-                    onClick = onShare,
-                    modifier = Modifier.weight(1f).height(44.dp),
-                    shape = RoundedCornerShape(22.dp),
-                    border = BorderStroke(1.dp, DyInput)
+                if (media.images.isNotEmpty()) {
+                    Spacer(Modifier.height(18.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.Image, contentDescription = null, tint = DyTextSecondary, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(7.dp))
+                        Text("图集 · ${media.images.size} 张", style = MaterialTheme.typography.titleMedium, color = DyText)
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    ImageGrid(
+                        media = media,
+                        title = title,
+                        onOpen = { fullscreenImageIndex = it },
+                        onDownload = onDownload,
+                        onMerge = onMerge,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MediaPreview(
+    media: MediaInfo,
+    platformColor: Color,
+    onFullscreenVideo: () -> Unit,
+    onOpenImage: (Int) -> Unit,
+) {
+    when {
+        media.videoUrl.isNotBlank() -> {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(16f / 9f)
+                    .background(Color.Black),
+            ) {
+                ExoPlayerPreview(media.videoUrl, Modifier.fillMaxSize(), autoPlay = false)
+                Box(
+                    Modifier
+                        .align(Alignment.TopStart)
+                        .padding(12.dp)
+                        .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(50))
+                        .padding(horizontal = 10.dp, vertical = 5.dp),
                 ) {
-                    Text("分享", fontSize = 14.sp, color = DyText)
+                    Text("视频预览", style = MaterialTheme.typography.labelMedium, color = Color.White)
                 }
-            }
-            if (playUrl.isNotEmpty()) {
-                Spacer(Modifier.height(10.dp))
-                ActionButton("下载无水印视频", DyRed) {
-                    onDownload(title, safeFilename(title, "mp4"), playUrl)
-                }
-            }
-            if (musicUrl.isNotEmpty()) {
-                Spacer(Modifier.height(8.dp))
-                ActionButton("下载音乐", DyCard) {
-                        onDownload("音乐 $title", safeFilename("$title-音乐", "mp3"), musicUrl)
-                }
-            }
-            images.forEachIndexed { i, img ->
-                Spacer(Modifier.height(8.dp))
-                AsyncImage(
-                    model = img.url,
-                    contentDescription = null,
+                TextButton(
+                    onClick = onFullscreenVideo,
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(240.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable { fullscreenImageIndex = i },
-                    contentScale = ContentScale.Crop
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp)
+                        .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(12.dp)),
+                ) {
+                    Icon(Icons.Filled.Fullscreen, contentDescription = null, tint = Color.White, modifier = Modifier.size(17.dp))
+                    Spacer(Modifier.width(5.dp))
+                    Text("全屏", color = Color.White, fontSize = 12.sp)
+                }
+            }
+        }
+        media.images.isNotEmpty() -> {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(16f / 10f)
+                    .clickable { onOpenImage(0) },
+            ) {
+                AsyncImage(
+                    model = media.coverUrl.ifBlank { media.images.first().preferredUrl },
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
                 )
-                if (img.livePhotoUrl.isNotEmpty()) {
-                    Spacer(Modifier.height(8.dp))
-                    ActionButton("下载动图 ${i + 1}", DyGreen) {
-                        onDownload("动图 ${i + 1}", "${awemeId}_${i + 1}_动图.mp4", img.livePhotoUrl)
-                    }
-                    if (musicUrl.isNotEmpty()) {
-                        Spacer(Modifier.height(8.dp))
-                        ActionButton("动图+音乐 合成 ${i + 1}", DyAmber) {
-                            onMerge(img.livePhotoUrl, musicUrl, "${awemeId}_${i + 1}_合并.mp4")
-                        }
-                    }
-                } else {
-                    Spacer(Modifier.height(8.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(
-                            onClick = { onDownload("图片 ${i + 1}", "${awemeId}_${i + 1}.jpg", img.url) },
-                            modifier = Modifier.weight(1f).height(46.dp),
-                            shape = RoundedCornerShape(23.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = DyRed)
-                        ) {
-                            Text("下载图片 ${i + 1}", fontSize = 14.sp)
-                        }
-                        if (img.originalUrl.isNotEmpty() && img.originalUrl != img.url) {
-                            OutlinedButton(
-                                onClick = { onDownload("原图 ${i + 1}", "${awemeId}_${i + 1}_原图.jpg", img.originalUrl) },
-                                modifier = Modifier.weight(1f).height(46.dp),
-                                shape = RoundedCornerShape(23.dp),
-                                border = BorderStroke(1.dp, DyInput)
-                            ) {
-                                Text("原图", fontSize = 14.sp, color = DyText)
-                            }
-                        }
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(Color.Transparent, Color.Black.copy(alpha = 0.42f)),
+                            )
+                        )
+                )
+                DyPill(
+                    text = if (media.images.size > 1) "1 / ${media.images.size}" else "查看原图",
+                    color = Color.White,
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(12.dp),
+                    icon = Icons.Filled.Fullscreen,
+                )
+            }
+        }
+        media.coverUrl.isNotBlank() -> {
+            AsyncImage(
+                model = media.coverUrl,
+                contentDescription = null,
+                modifier = Modifier.fillMaxWidth().aspectRatio(16f / 10f),
+                contentScale = ContentScale.Crop,
+            )
+        }
+        else -> {
+            Box(
+                Modifier.fillMaxWidth().aspectRatio(16f / 7f).background(DyInput),
+                contentAlignment = Alignment.Center,
+            ) {
+                DyPill("无预览图", platformColor)
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatsRow(stats: MediaStats) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Metric("点赞", stats.diggCount, Modifier.weight(1f))
+        Metric("评论", stats.commentCount, Modifier.weight(1f))
+        Metric("收藏", stats.collectCount, Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun Metric(label: String, value: Long, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        color = DyInput,
+        shape = RoundedCornerShape(13.dp),
+        border = BorderStroke(1.dp, DyBorder.copy(alpha = 0.58f)),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 9.dp, vertical = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(formatCount(value), style = MaterialTheme.typography.labelLarge, color = DyText)
+            Text(label, style = MaterialTheme.typography.bodySmall, color = DyTextSecondary)
+        }
+    }
+}
+
+@Composable
+private fun MusicDownloadRow(title: String, onDownload: () -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = DyInput,
+        shape = RoundedCornerShape(15.dp),
+        border = BorderStroke(1.dp, DyBorder.copy(alpha = 0.65f)),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 11.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            DyIconTile(Icons.Filled.MusicNote, tint = DyGreen, size = 38.dp)
+            Column(Modifier.weight(1f)) {
+                Text("原声", style = MaterialTheme.typography.bodySmall, color = DyTextSecondary)
+                Text(title, style = MaterialTheme.typography.labelLarge, color = DyText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            TextButton(onClick = onDownload) {
+                Icon(Icons.Filled.Download, contentDescription = null, modifier = Modifier.size(16.dp), tint = DyGreen)
+                Spacer(Modifier.width(4.dp))
+                Text("下载", color = DyGreen)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ImageGrid(
+    media: MediaInfo,
+    title: String,
+    onOpen: (Int) -> Unit,
+    onDownload: (String, String, String) -> Unit,
+    onMerge: (String, String, String) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        media.images.chunked(2).forEachIndexed { rowIndex, row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                row.forEachIndexed { columnIndex, image ->
+                    val index = rowIndex * 2 + columnIndex
+                    ImageTile(
+                        image = image,
+                        index = index,
+                        title = title,
+                        mediaId = media.id,
+                        onOpen = { onOpen(index) },
+                        onDownload = onDownload,
+                        onMerge = onMerge,
+                        musicUrl = media.musicUrl,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                if (row.size == 1) Spacer(Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun ImageTile(
+    image: MediaImage,
+    index: Int,
+    title: String,
+    mediaId: String,
+    onOpen: () -> Unit,
+    onDownload: (String, String, String) -> Unit,
+    onMerge: (String, String, String) -> Unit,
+    musicUrl: String,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f)
+                .clip(RoundedCornerShape(16.dp))
+                .clickable(onClick = onOpen),
+        ) {
+            AsyncImage(
+                model = image.url,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
+            Box(
+                Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(8.dp)
+                    .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(50))
+                    .padding(horizontal = 8.dp, vertical = 3.dp),
+            ) {
+                Text("${index + 1}", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+            TextButton(
+                onClick = {
+                    onDownload(
+                        "${title}_原图${index + 1}",
+                        "${mediaId}_${index + 1}_原图.jpg",
+                        image.preferredUrl,
+                    )
+                },
+                contentPadding = PaddingValues(horizontal = 4.dp),
+                modifier = Modifier.weight(1f),
+            ) {
+                Text("原图", fontSize = 12.sp, color = DyText)
+            }
+            if (image.livePhotoUrl.isNotBlank()) {
+                TextButton(
+                    onClick = {
+                        onDownload(
+                            "${title}_动图${index + 1}",
+                            "${mediaId}_${index + 1}_动图.mp4",
+                            image.livePhotoUrl,
+                        )
+                    },
+                    contentPadding = PaddingValues(horizontal = 4.dp),
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text("动图", fontSize = 12.sp, color = DyGreen)
+                }
+                if (musicUrl.isNotBlank()) {
+                    TextButton(
+                        onClick = { onMerge(image.livePhotoUrl, musicUrl, "${mediaId}_${index + 1}_合并.mp4") },
+                        contentPadding = PaddingValues(horizontal = 4.dp),
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text("合成", fontSize = 12.sp, color = DyCyan)
                     }
                 }
             }
@@ -321,45 +521,140 @@ internal fun ResultCard(
 }
 
 @Composable
-private fun ActionButton(text: String, color: Color, onClick: () -> Unit) {
-    Button(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth().height(46.dp),
-        shape = RoundedCornerShape(23.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = color)
+internal fun HistoryCard(item: HistoryItem, onClick: (HistoryItem) -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().clickable { onClick(item) },
+        shape = RoundedCornerShape(18.dp),
+        color = DyCard,
+        border = BorderStroke(1.dp, DyBorder.copy(alpha = 0.62f)),
     ) {
-        Text(text, fontSize = 14.sp)
+        Row(
+            modifier = Modifier.padding(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            AsyncImage(
+                model = item.cover,
+                contentDescription = null,
+                modifier = Modifier
+                    .size(width = 78.dp, height = 58.dp)
+                    .clip(RoundedCornerShape(12.dp)),
+                contentScale = ContentScale.Crop,
+            )
+            Column(Modifier.weight(1f)) {
+                Text(
+                    item.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = DyText,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    DyPill(
+                        text = if (item.sourceUrl.contains("xiaohongshu") || item.sourceUrl.contains("xhslink")) "小红书" else "抖音",
+                        color = if (item.sourceUrl.contains("xiaohongshu") || item.sourceUrl.contains("xhslink")) DyRed else DyCyan,
+                    )
+                    Spacer(Modifier.width(7.dp))
+                    Text(
+                        SimpleDateFormat("MM-dd HH:mm", java.util.Locale.CHINA).format(Date(item.time)),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = DyTextSecondary,
+                    )
+                }
+            }
+            Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = DyTextSecondary)
+        }
     }
 }
 
-/** ExoPlayer 预览:生命周期感知,离开组合自动释放;active=false 时暂停 */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ExoPlayerPreview(url: String, modifier: Modifier = Modifier, active: Boolean = true) {
+private fun FullscreenImagePager(images: List<MediaImage>, initialIndex: Int, onDismiss: () -> Unit) {
+    val pagerState = rememberPagerState(initialPage = initialIndex) { images.size }
+    Dialog(onDismissRequest = onDismiss) {
+        Box(Modifier.fillMaxSize().background(Color.Black)) {
+            HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    AsyncImage(
+                        model = images[page].preferredUrl,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit,
+                    )
+                }
+            }
+            Text(
+                "${pagerState.currentPage + 1} / ${images.size}",
+                color = Color.White,
+                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 30.dp)
+                    .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(50))
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+            )
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(16.dp)
+                    .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(50)),
+            ) {
+                Icon(Icons.Filled.Close, contentDescription = "关闭", tint = Color.White)
+            }
+        }
+    }
+}
+
+@Composable
+private fun FullscreenVideoDialog(url: String, onDismiss: () -> Unit) {
+    Dialog(onDismissRequest = onDismiss) {
+        Box(Modifier.fillMaxSize().background(Color.Black)) {
+            ExoPlayerPreview(url, Modifier.fillMaxSize(), autoPlay = true)
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(16.dp)
+                    .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(50)),
+            ) {
+                Icon(Icons.Filled.Close, contentDescription = "退出全屏", tint = Color.White)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ExoPlayerPreview(
+    url: String,
+    modifier: Modifier = Modifier,
+    active: Boolean = true,
+    autoPlay: Boolean = false,
+) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val player = remember(url) {
         ExoPlayer.Builder(context).build().apply {
             setMediaItem(MediaItem.fromUri(url))
             prepare()
-            playWhenReady = true
+            playWhenReady = false
         }
     }
-    // url 变化时更新媒体源
     LaunchedEffect(url) {
         player.setMediaItem(MediaItem.fromUri(url))
         player.prepare()
-        if (active) player.play()
+        if (active && autoPlay) player.play() else player.pause()
     }
-    LaunchedEffect(active) {
-        if (active) player.play() else player.pause()
+    LaunchedEffect(active, autoPlay) {
+        if (!active) player.pause() else if (autoPlay) player.play()
     }
-    // 释放绑定 url:url 变化时旧 player 立即释放,避免解码器/音频会话泄漏
     DisposableEffect(lifecycleOwner, url) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_START -> player.play()
+                Lifecycle.Event.ON_START -> if (autoPlay && active) player.play() else player.pause()
                 Lifecycle.Event.ON_STOP -> player.pause()
-                else -> {}
+                else -> Unit
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -375,38 +670,24 @@ private fun ExoPlayerPreview(url: String, modifier: Modifier = Modifier, active:
                 this.player = player
             }
         },
-        modifier = modifier
+        modifier = modifier,
     )
 }
 
-@Composable
-internal fun HistoryCard(item: HistoryItem, onClick: (HistoryItem) -> Unit) {
-    Surface(
-        modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp).clickable { onClick(item) },
-        shape = RoundedCornerShape(14.dp),
-        color = DyCard
-    ) {
-        Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-            AsyncImage(
-                model = item.cover,
-                contentDescription = null,
-                modifier = Modifier.size(width = 70.dp, height = 90.dp).clip(RoundedCornerShape(10.dp)),
-                contentScale = ContentScale.Crop
-            )
-            Spacer(Modifier.width(10.dp))
-            Column(Modifier.weight(1f)) {
-                Text(item.title, fontSize = 14.sp, color = DyText, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    SimpleDateFormat("MM-dd HH:mm").format(Date(item.time)),
-                    fontSize = 12.sp, color = DyTextSecondary
-                )
-            }
-        }
-    }
+private fun MediaStats.hasAnyValue(): Boolean =
+    diggCount > 0 || commentCount > 0 || collectCount > 0 || shareCount > 0
+
+private fun formatCount(value: Long): String = when {
+    value >= 100_000_000 -> "%.1f亿".format(value / 100_000_000.0)
+    value >= 10_000 -> "%.1f万".format(value / 10_000.0)
+    else -> value.toString()
 }
 
-/** 由标题生成安全文件名:清洗非法字符、截断长度、保证扩展名 */
+private fun formatDuration(durationMs: Long): String {
+    val totalSeconds = durationMs / 1000
+    return "%d:%02d".format(totalSeconds / 60, totalSeconds % 60)
+}
+
 private fun safeFilename(title: String, ext: String): String {
     val cleaned = title
         .replace(Regex("""[\\/:*?"<>|\r\n\t]"""), " ")
@@ -416,5 +697,3 @@ private fun safeFilename(title: String, ext: String): String {
         .ifBlank { "下载文件" }
     return "$cleaned.$ext"
 }
-
-

@@ -2,7 +2,6 @@ package com.douyin.feature.home
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -10,37 +9,75 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentPaste
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.douyin.core.designsystem.DyBorder
 import com.douyin.core.designsystem.DyCard
+import com.douyin.core.designsystem.DyCyan
+import com.douyin.core.designsystem.DyIconTile
 import com.douyin.core.designsystem.DyInput
+import com.douyin.core.designsystem.DyPageHeader
+import com.douyin.core.designsystem.DyPanel
+import com.douyin.core.designsystem.DyPill
 import com.douyin.core.designsystem.DyRed
+import com.douyin.core.designsystem.DySectionHeader
+import com.douyin.core.designsystem.DySurfaceHigh
 import com.douyin.core.designsystem.DyText
 import com.douyin.core.designsystem.DyTextSecondary
+import com.douyin.core.designsystem.DyTextTertiary
 import com.douyin.core.model.MediaInfo
 import com.douyin.core.model.ParseFailure
 import com.douyin.data.history.HistoryItem
 
-/** 首页入口:接收 ViewModel 状态,渲染完整首页 */
+/** 首页：链接输入、解析状态、结果和最近记录。 */
 @Composable
 fun HomeScreen(
     input: String,
     onInputChange: (String) -> Unit,
+    onPaste: () -> Unit,
     onParse: () -> Unit,
     loading: Boolean,
     error: ParseFailure?,
@@ -54,149 +91,90 @@ fun HomeScreen(
     onDismissClipboard: () -> Unit = {},
     isFavorite: Boolean = false,
     onToggleFavorite: () -> Unit = {},
-    onShareResult: () -> Unit = {}
+    onShareResult: () -> Unit = {},
 ) {
-    var btnPressed by remember { mutableStateOf(false) }
     Box(Modifier.fillMaxSize()) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(16.dp)
+            contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            item { HomeHeader() }
             item {
-                Text("拾刻", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = DyText)
-                Text("粘贴抖音/小红书链接,一键获取无水印内容", fontSize = 13.sp, color = DyTextSecondary)
-                Spacer(Modifier.height(14.dp))
-            }
-            item {
-            OutlinedTextField(
-                value = input,
-                onValueChange = onInputChange,
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("粘贴抖音/小红书分享链接或口令", color = DyTextSecondary) },
-                minLines = 3,
-                maxLines = 5,
-                shape = RoundedCornerShape(12.dp),
-                trailingIcon = {
-                    if (input.isNotEmpty()) {
-                        IconButton(onClick = { onInputChange("") }) {
-                            Text("✕", color = DyTextSecondary, fontSize = 16.sp)
-                        }
-                    }
-                },
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = DyRed,
-                    unfocusedBorderColor = DyInput,
-                    focusedContainerColor = DyInput,
-                    unfocusedContainerColor = DyInput,
-                    cursorColor = DyRed
+                ParsePanel(
+                    input = input,
+                    onInputChange = onInputChange,
+                    onPaste = onPaste,
+                    onParse = onParse,
+                    loading = loading,
                 )
-            )
-                Spacer(Modifier.height(12.dp))
-                // 解析按钮:按压缩放反馈
-                val btnScale by animateFloatAsState(
-                    targetValue = if (btnPressed) 0.94f else 1f,
-                    animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
-                    label = "btnScale"
-                )
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .graphicsLayer { scaleX = btnScale; scaleY = btnScale }
-                ) {
-                    Button(
-                        onClick = onParse,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(52.dp)
-                            .pointerInput(Unit) {
-                                detectTapGestures(
-                                    onPress = {
-                                        btnPressed = true
-                                        tryAwaitRelease()
-                                        btnPressed = false
-                                    },
-                                    onTap = { onParse() }
-                                )
-                            },
-                        enabled = !loading,
-                        shape = RoundedCornerShape(26.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = DyRed)
-                    ) {
-                        Text("解析", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-                if (loading) {
-                    Spacer(Modifier.height(16.dp))
-                    LinearProgressIndicator(
-                        modifier = Modifier.fillMaxWidth().height(3.dp),
-                        color = DyRed,
-                        trackColor = DyInput
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Text("解析中...", fontSize = 12.sp, color = DyTextSecondary)
-                }
-                if (error != null) {
-                    Spacer(Modifier.height(10.dp))
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        color = Color(0x22FF6B6B),
-                        border = BorderStroke(1.dp, Color(0x66FF6B6B))
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                error.message,
-                                modifier = Modifier.weight(1f),
-                                fontSize = 13.sp,
-                                color = Color(0xFFFF8A8A)
-                            )
-                            if (error.isRetryable) {
-                                TextButton(onClick = onParse) {
-                                    Text("重试", color = DyRed)
-                                }
-                            }
-                        }
-                    }
-                }
             }
-            result?.let {
-                item { Spacer(Modifier.height(12.dp)) }
+            if (loading) {
                 item {
-                    // 结果卡片:淡入 + 上滑
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        LinearProgressIndicator(
+                            modifier = Modifier.fillMaxWidth().height(2.dp),
+                            color = DyRed,
+                            trackColor = DyBorder.copy(alpha = 0.55f),
+                        )
+                        Text(
+                            "正在连接平台并提取原始媒体…",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = DyTextSecondary,
+                        )
+                    }
+                }
+            }
+            if (error != null) {
+                item { ErrorPanel(error = error, onRetry = onParse) }
+            }
+            if (result != null) {
+                item {
                     AnimatedVisibility(
                         visible = true,
-                        enter = fadeIn(tween(350)) + slideInVertically(
-                            animationSpec = tween(350),
-                            initialOffsetY = { it / 8 }
-                        )
+                        enter = fadeIn(tween(320)) + slideInVertically(
+                            animationSpec = tween(320),
+                            initialOffsetY = { it / 10 },
+                        ),
                     ) {
                         ResultCard(
-                            media = it,
+                            media = result,
                             onDownload = onDownload,
                             onMerge = onMerge,
                             isFavorite = isFavorite,
                             onToggleFavorite = onToggleFavorite,
-                            onShare = onShareResult
+                            onShare = onShareResult,
                         )
                     }
                 }
             }
             item {
-                Spacer(Modifier.height(22.dp))
-                Text("最近解析", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = DyText)
-                Spacer(Modifier.height(8.dp))
+                DySectionHeader(
+                    title = "最近解析",
+                    subtitle = if (history.isEmpty()) "解析过的内容会保存在这里" else "共 ${history.size} 条本地记录",
+                    trailing = {
+                        DyPill(text = "${history.size}", color = if (history.isEmpty()) DyTextTertiary else DyCyan)
+                    },
+                )
             }
             if (history.isEmpty()) {
                 item {
-                    Text(
-                        "暂无记录,解析过的视频会出现在这里",
-                        fontSize = 13.sp,
-                        color = DyTextSecondary,
-                        modifier = Modifier.padding(vertical = 8.dp)
-                    )
+                    DyPanel(contentPadding = 14.dp) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            DyIconTile(Icons.Filled.History, tint = DyTextSecondary, size = 42.dp)
+                            Column(Modifier.weight(1f)) {
+                                Text("还没有解析记录", style = MaterialTheme.typography.titleMedium, color = DyText)
+                                Text(
+                                    "粘贴第一条分享链接，结果会自动保存在本机。",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = DyTextSecondary,
+                                )
+                            }
+                        }
+                    }
                 }
             } else {
                 items(history, key = { it.awemeId }) { item ->
@@ -205,40 +183,211 @@ fun HomeScreen(
             }
         }
 
-        // 剪贴板快捷解析卡片(底部滑入)
         AnimatedVisibility(
             visible = clipboardSuggestion != null,
+            modifier = Modifier.align(Alignment.BottomCenter),
             enter = slideInVertically(
                 animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
-                initialOffsetY = { it }
-            ) + fadeIn(tween(200)),
-            exit = slideOutVertically(tween(200)) { it } + fadeOut(tween(200))
+                initialOffsetY = { it },
+            ) + fadeIn(tween(180)),
+            exit = slideOutVertically(tween(160)) { it } + fadeOut(tween(160)),
         ) {
             clipboardSuggestion?.let { link ->
-                Surface(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(16.dp)
-                        .fillMaxWidth()
-                        .clickable { onParseClipboard() },
-                    shape = RoundedCornerShape(14.dp),
-                    color = DyCard,
-                    shadowElevation = 8.dp
-                ) {
-                Row(
-                    Modifier.padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text("检测到链接", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = DyText)
-                        Text(link, fontSize = 12.sp, color = DyTextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                ClipboardSuggestion(
+                    link = link,
+                    onParse = onParseClipboard,
+                    onDismiss = onDismissClipboard,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeHeader() {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(52.dp)
+                .clip(RoundedCornerShape(17.dp))
+                .background(Brush.linearGradient(listOf(DyRed, Color(0xFFFF7A5C)))),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("拾", color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.Bold)
+        }
+        DyPageHeader(
+            title = "拾刻",
+            subtitle = "把喜欢的内容，干净地留在本地。",
+            eyebrow = "SHIKE · MEDIA KIT",
+            modifier = Modifier.weight(1f),
+            trailing = { DyPill(text = "本地解析", color = DyCyan) },
+        )
+    }
+}
+
+@Composable
+private fun ParsePanel(
+    input: String,
+    onInputChange: (String) -> Unit,
+    onPaste: () -> Unit,
+    onParse: () -> Unit,
+    loading: Boolean,
+) {
+    DyPanel(contentPadding = 16.dp) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text("分享链接", style = MaterialTheme.typography.titleMedium, color = DyText)
+            Spacer(Modifier.weight(1f))
+            DyPill("抖音", DyCyan)
+            DyPill("小红书", DyRed)
+        }
+        Spacer(Modifier.height(12.dp))
+        OutlinedTextField(
+            value = input,
+            onValueChange = onInputChange,
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = {
+                Text(
+                    "粘贴分享文案、短链或作品链接",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = DyTextTertiary,
+                )
+            },
+            leadingIcon = {
+                Icon(Icons.Filled.Link, contentDescription = null, tint = DyTextSecondary)
+            },
+            trailingIcon = {
+                if (input.isNotEmpty()) {
+                    IconButton(onClick = { onInputChange("") }) {
+                        Icon(Icons.Filled.Close, contentDescription = "清空", tint = DyTextSecondary)
                     }
-                    Text("解析", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = DyRed,
-                        modifier = Modifier.padding(horizontal = 12.dp))
-                    Text("✕", fontSize = 14.sp, color = DyTextSecondary,
-                        modifier = Modifier.clickable { onDismissClipboard() })
                 }
+            },
+            minLines = 2,
+            maxLines = 5,
+            shape = RoundedCornerShape(16.dp),
+            textStyle = MaterialTheme.typography.bodyMedium,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = DyText,
+                unfocusedTextColor = DyText,
+                focusedBorderColor = DyRed.copy(alpha = 0.75f),
+                unfocusedBorderColor = DyBorder,
+                focusedContainerColor = DyInput,
+                unfocusedContainerColor = DyInput,
+                cursorColor = DyRed,
+            ),
+        )
+        Spacer(Modifier.height(12.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            OutlinedButton(
+                onClick = onPaste,
+                modifier = Modifier.height(48.dp),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, DyBorder),
+            ) {
+                Icon(Icons.Filled.ContentPaste, contentDescription = null, modifier = Modifier.size(17.dp), tint = DyText)
+                Spacer(Modifier.size(7.dp))
+                Text("粘贴", color = DyText)
+            }
+            Button(
+                onClick = onParse,
+                enabled = input.isNotBlank() && !loading,
+                modifier = Modifier.weight(1f).height(48.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = DyRed,
+                    contentColor = Color.White,
+                    disabledContainerColor = DyRed.copy(alpha = 0.28f),
+                    disabledContentColor = Color.White.copy(alpha = 0.55f),
+                ),
+            ) {
+                if (loading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(17.dp),
+                        strokeWidth = 2.dp,
+                        color = Color.White,
+                    )
+                } else {
+                    Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(18.dp))
                 }
+                Spacer(Modifier.size(8.dp))
+                Text(if (loading) "解析中" else "开始解析", fontWeight = FontWeight.SemiBold)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ErrorPanel(error: ParseFailure, onRetry: () -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        color = Color(0x1FFF647A),
+        border = BorderStroke(1.dp, Color(0x4DFF647A)),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Icon(Icons.Filled.Link, contentDescription = null, tint = Color(0xFFFF8A9C), modifier = Modifier.size(20.dp))
+            Column(Modifier.weight(1f)) {
+                Text("这次没有解析成功", style = MaterialTheme.typography.labelLarge, color = Color(0xFFFF9AAA))
+                Text(error.message, style = MaterialTheme.typography.bodySmall, color = DyTextSecondary)
+            }
+            if (error.isRetryable) {
+                TextButton(onClick = onRetry) {
+                    Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(15.dp))
+                    Spacer(Modifier.size(4.dp))
+                    Text("重试")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ClipboardSuggestion(
+    link: String,
+    onParse: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().padding(16.dp),
+        shape = RoundedCornerShape(20.dp),
+        color = DySurfaceHigh,
+        border = BorderStroke(1.dp, DyBorder),
+        shadowElevation = 18.dp,
+    ) {
+        Row(
+            modifier = Modifier.padding(start = 14.dp, end = 6.dp, top = 10.dp, bottom = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            DyIconTile(Icons.Filled.ContentPaste, tint = DyCyan, size = 40.dp)
+            Column(Modifier.weight(1f)) {
+                Text("检测到分享链接", style = MaterialTheme.typography.labelLarge, color = DyText)
+                Text(
+                    link,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = DyTextSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            TextButton(onClick = onParse) { Text("解析", color = DyRed) }
+            IconButton(onClick = onDismiss) {
+                Icon(Icons.Filled.Close, contentDescription = "关闭", tint = DyTextSecondary)
             }
         }
     }

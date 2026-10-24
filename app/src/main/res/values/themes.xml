@@ -5,5 +5,7 @@
         <item name="android:statusBarColor">@color/dy_bg</item>
         <item name="android:navigationBarColor">@color/dy_bg</item>
         <item name="android:colorAccent">@color/dy_red</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:fontFamily">sans</item>
     </style>
 </resources>
