@@ -13,7 +13,6 @@ import com.douyin.data.settings.SettingsRepository
 import com.douyin.data.favorites.FavoritesRepository
 import com.douyin.data.favorites.PrefsFavoritesRepository
 import com.douyin.data.transfer.WifiTransferServer
-import com.douyin.data.xhs.XhsHttpRepository
 import com.douyin.data.xhs.XhsRepository
 import com.douyin.feature.home.HomeViewModel
 import com.douyin.feature.settings.SettingsViewModel
@@ -28,7 +27,7 @@ import org.koin.dsl.module
 /** 依赖注入装配:app 层是唯一知道具体实现的地方,feature 只依赖接口 */
 val appModule = module {
     single<DouyinRepository> { ChaquopyDouyinRepository() }
-    single<XhsRepository> { XhsHttpRepository() }
+    single<XhsRepository> { ChaquopyXhsRepository() }
     single<DownloadRepository> { AndroidDownloadRepository().also { it.init(androidContext()) } }
     single<HistoryRepository> { PrefsHistoryRepository(androidContext()) }
     single<VideoMerger> { FfmpegVideoMerger() }

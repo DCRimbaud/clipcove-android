@@ -8,10 +8,10 @@
 // 娴嬭瘯鐗?0.x.x(鏈寮忓彂甯?鎸夊姛鑳?淇杩唬閫掑 minor/patch)
 // 姝ｅ紡鐗?1.0.0 璧锋,涔嬪悗姘歌繙 1.x.x(2.0.0 浠呭湪閲嶅ぇ閲嶆瀯鏃朵娇鐢?
 val versionMajor = 0        // 0=test 1=release
-val versionMinor = 8        // feature
-val versionPatch = 1        // fix
+val versionMinor = 9        // feature
+val versionPatch = 0        // fix
 val appVersionName = "$versionMajor.$versionMinor.$versionPatch"
-val appVersionCode = 10
+val appVersionCode = 11
 
 android {
     namespace = "com.douyin.parser"

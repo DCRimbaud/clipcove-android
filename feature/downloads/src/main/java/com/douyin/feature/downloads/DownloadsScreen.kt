@@ -1,11 +1,16 @@
 package com.douyin.feature.downloads
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import android.widget.Toast
+import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -154,6 +159,17 @@ private fun shareDownloaded(context: Context, task: DownloadTask) {
 
 @Suppress("DEPRECATION")
 private fun saveToDownloads(context: Context, task: DownloadTask) {
+    if (Build.VERSION.SDK_INT < 29 &&
+        ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) !=
+        PackageManager.PERMISSION_GRANTED
+    ) {
+        (context as? android.app.Activity)?.requestPermissions(
+            arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE),
+            REQUEST_WRITE_STORAGE,
+        )
+        Toast.makeText(context, "请允许存储权限后再次点击另存", Toast.LENGTH_LONG).show()
+        return
+    }
     // 文件 IO 放后台线程,避免主线程复制大文件 ANR
     Thread {
         try {
@@ -191,6 +207,19 @@ private fun runOnUiThread(context: Context, block: () -> Unit) {
 }
 
 private fun queryDownloadUri(context: Context, filename: String): Uri? {
+    if (Build.VERSION.SDK_INT < 29) {
+        val file = File(
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+            filename,
+        )
+        if (!file.exists()) return null
+        return FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+    }
+    return queryMediaStoreDownload(context, filename)
+}
+
+@androidx.annotation.RequiresApi(Build.VERSION_CODES.Q)
+private fun queryMediaStoreDownload(context: Context, filename: String): Uri? {
     val collection = MediaStore.Downloads.EXTERNAL_CONTENT_URI
     val selection = "${MediaStore.Downloads.DISPLAY_NAME}=?"
     context.contentResolver.query(collection, null, selection, arrayOf(filename), null)?.use { c ->
@@ -209,6 +238,8 @@ private fun guessMime(filename: String): String =
         "webp" -> "image/webp"
         else -> "video/mp4"
     }
+
+private const val REQUEST_WRITE_STORAGE = 201
 
 private fun formatSpeed(bps: Long): String {
     if (bps <= 0) return "--"

@@ -23,11 +23,12 @@ douyin-app/
 ├── gradle/libs.versions.toml      # 版本目录(单一依赖版本源)
 ├── app/                           # 壳:Koin DI 装配 + 导航(唯一知道实现的地方)
 ├── core/
+│   ├── model/                     # 强类型媒体模型 / 解析结果 / 错误分类
 │   ├── designsystem/              # 主题 / 颜色 / 通用 UI
 │   └── common/                    # 通用工具
 ├── data/
 │   ├── douyin/                    # DouyinRepository 接口(Python 引擎解析)
-│   ├── xhs/                       # XhsRepository(小红书 SSR 提取 + 多源 API)
+│   ├── xhs/                       # XhsRepository + 小红书 SSR 映射
 │   ├── download/                  # DownloadRepository(StateFlow 任务流)
 │   ├── history/                   # HistoryRepository(解析历史)
 │   ├── favorites/                 # FavoritesRepository(收藏)
@@ -41,8 +42,9 @@ douyin-app/
     └── settings/                  # 设置页
 ```
 
-- 依赖方向:`feature → data 接口 / core → app 装配`,无反向依赖
-- 增删平台 = 增 data 模块 + 首页一行路由;换实现只改 app 装配
+- 依赖方向:`feature → core:model + data 接口 → app 装配`,无反向依赖
+- 平台解析统一返回 `ParseResult`，平台 JSON 只在 data 层映射
+- 增删平台 = 增 data 模块 + 解析路由;换实现只改 app 装配
 - 状态管理:ViewModel + StateFlow;图片:Coil(按域名 Referer);播放:Media3 ExoPlayer;DI:Koin
 
 ## 版本规则
@@ -61,6 +63,15 @@ $env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
 
 产物:`app\build\outputs\apk\debug\app-debug.apk`(Python 路径可用环境变量 `PYTHON_EXE` 覆盖)
 
+## 开发验证
+
+```powershell
+.\gradlew.bat lintDebug testDebugUnitTest assembleDebug
+python tools\smoke_network.py
+```
+
+`smoke_network.py` 会访问真实平台，可能受网络、风控或作品时效影响，不属于普通 CI。
+
 ## 安装
 
 - `adb install app-debug.apk`(小米需在开发者选项开启「USB 安装」)
@@ -69,6 +80,7 @@ $env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
 ## 说明
 
 - 抖音解析引擎:Chaquopy 内嵌 Python(a_bogus 签名),代码在 `app/src/main/python/`
+- 小红书抓取:Chaquopy Python 获取官方 SSR 页面,Kotlin 负责类型映射与结构校验
 - 小红书解析:直接抓取笔记页 SSR 数据(点赞/评论/收藏/时间齐全),第三方 API 作备源
 - 小红书分享链接带时效(xsec_token 约 24h),过期后需重新复制分享链接
 - 仅个人学习使用,注意版权合规

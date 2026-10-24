@@ -5,6 +5,32 @@
 
 ---
 
+## [0.9.0] - 2026-10-25
+
+### ♻️ 架构重构
+- 新增 `core:model`，统一输出 `MediaInfo`、`MediaStats`、`MediaImage` 和 `ParseResult`
+- 抖音、小红书仓库不再向 ViewModel/UI 暴露平台 JSON，错误统一为可分类的 `ParseFailure`
+- 网络、风控、作品失效、页面结构变化分别建模；只有瞬时问题自动重试
+- 小红书移除两个已失效的第三方解析接口，只保留官方 SSR 主链路
+- 小红书页面抓取迁至 Chaquopy Python 网络栈，修复部分 Android 网络环境只返回通用页的问题
+- 首页 ViewModel 拆分解析状态机；624 行首页拆为页面编排与独立媒体组件
+- 解析错误支持按类型展示，瞬时错误提供“重试”操作
+
+### 🐛 修复
+- 修复 Android 9 及以下“另存/打开/分享”缺少存储权限与 `FileProvider` 的兼容问题
+- 修复下载页直接引用 API 29 `MediaStore.Downloads` 的潜在崩溃路径
+
+### ✅ 工程化
+- 增加抖音 JSON 映射与小红书 SSR 映射单元测试
+- 增加 GitHub Actions Android CI
+- 增加 `tools/smoke_network.py` 联网冒烟测试
+- 初始化 Git 仓库并以 0.8.1 作为基线
+
+### ⚙️ 版本
+- 0.8.1 → 0.9.0（可靠性与可维护性重构）
+
+---
+
 ## [0.8.1] - 2026-10-25
 
 ### 🐛 修复

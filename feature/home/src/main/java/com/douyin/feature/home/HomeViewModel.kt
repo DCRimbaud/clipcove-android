@@ -9,6 +9,8 @@ import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.douyin.core.model.MediaInfo
+import com.douyin.core.model.ParseFailure
+import com.douyin.core.model.ParseFailureType
 import com.douyin.core.model.ParseResult
 import com.douyin.data.douyin.DouyinRepository
 import com.douyin.data.download.DownloadRepository
@@ -40,8 +42,8 @@ class HomeViewModel(
     private val _loading = MutableStateFlow(false)
     val loading: StateFlow<Boolean> = _loading
 
-    private val _error = MutableStateFlow("")
-    val error: StateFlow<String> = _error
+    private val _error = MutableStateFlow<ParseFailure?>(null)
+    val error: StateFlow<ParseFailure?> = _error
 
     private val _result = MutableStateFlow<MediaInfo?>(null)
     val result: StateFlow<MediaInfo?> = _result
@@ -61,7 +63,7 @@ class HomeViewModel(
 
     fun onInputChange(value: String) {
         _input.value = value
-        if (_error.value.isNotEmpty()) _error.value = ""
+        if (_error.value != null) _error.value = null
     }
 
     fun acceptIncoming(text: String?) {
@@ -123,13 +125,13 @@ class HomeViewModel(
     fun parse() {
         val originalInput = _input.value.trim()
         if (originalInput.isEmpty()) {
-            _error.value = "请先粘贴链接"
+            _error.value = ParseFailure(ParseFailureType.INVALID_LINK, "请先粘贴链接")
             return
         }
         if (_loading.value) return
 
         _loading.value = true
-        _error.value = ""
+        _error.value = null
         val platform = detectPlatform(originalInput)
         val target = if (platform == SourcePlatform.XIAOHONGSHU) {
             extractHttpUrl(originalInput)
@@ -153,14 +155,18 @@ class HomeViewModel(
                         }
                         _result.value = null
                         _isFavorite.value = false
-                        _error.value = outcome.error.message.ifBlank { "解析失败，请稍后重试" }
+                        _error.value = outcome.error
                     }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Unexpected parse failure", e)
                 _result.value = null
                 _isFavorite.value = false
-                _error.value = "解析失败，请稍后重试"
+                _error.value = ParseFailure(
+                    ParseFailureType.UNKNOWN,
+                    "解析失败，请稍后重试",
+                    e.message,
+                )
             } finally {
                 _loading.value = false
             }

@@ -13,20 +13,34 @@ import org.json.JSONObject
 import java.security.MessageDigest
 
 /** 纯解析器：输入官方笔记页 HTML，输出统一媒体模型，不执行网络请求。 */
-internal object XhsSsrParser {
+object XhsSsrParser {
 
     fun parse(html: String, sourceUrl: String): ParseResult {
         val state = extractInitialState(html)
-            ?: return failure("小红书页面结构已变化，请确认使用最新分享链接")
-        val noteMap = state.optJSONObject("note")?.optJSONObject("noteDetailMap")
-            ?: return failure("小红书页面中没有笔记数据")
+            ?: return failure(
+                "小红书页面结构已变化，请确认使用最新分享链接",
+                "initial_state_missing bytes=${html.length}",
+            )
+        val note = state.optJSONObject("note")
+            ?: return failure(
+                "小红书页面中没有笔记数据",
+                "note_missing topKeys=${state.keys().asSequence().take(16).joinToString(",")}",
+            )
+        val noteMap = note.optJSONObject("noteDetailMap")
+            ?: return failure(
+                "小红书页面中没有笔记数据",
+                "note_detail_map_missing noteKeys=${note.keys().asSequence().take(16).joinToString(",")}",
+            )
         val key = noteMap.keys().asSequence().firstOrNull()
-            ?: return failure("小红书笔记数据为空")
-        val note = noteMap.optJSONObject(key)?.optJSONObject("note")
-            ?: return failure("小红书笔记详情格式已变化")
+            ?: return failure("小红书笔记数据为空", "note_detail_map_empty")
+        val detail = noteMap.optJSONObject(key)?.optJSONObject("note")
+            ?: return failure(
+                "小红书笔记详情格式已变化",
+                "note_detail_missing entryKeys=${noteMap.optJSONObject(key)?.keys()?.asSequence()?.take(16)?.joinToString(",")}",
+            )
 
         return try {
-            ParseResult.Success(normalize(note, key, sourceUrl))
+            ParseResult.Success(normalize(detail, key, sourceUrl))
         } catch (e: Exception) {
             ParseResult.Failure(
                 ParseFailure(
