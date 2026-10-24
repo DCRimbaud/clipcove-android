@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="dy_bg">#141518</color>
+    <color name="dy_bg_card">#1E1E22</color>
+    <color name="dy_bg_input">#26262B</color>
+    <color name="dy_red">#FE2C55</color>
+    <color name="dy_cyan">#25F4EE</color>
+    <color name="dy_text">#FFFFFF</color>
+    <color name="dy_text_secondary">#8A8A93</color>
+    <color name="dy_border">#2A2A30</color>
+    <color name="dy_green">#22C55E</color>
+    <color name="dy_amber">#F59E0B</color>
+</resources>

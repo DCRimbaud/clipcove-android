@@ -1,0 +1,24 @@
+package com.douyin.data.settings
+
+import android.content.Context
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+
+/** SharedPreferences 实现 */
+class PrefsSettingsRepository(context: Context) : SettingsRepository {
+
+    private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
+    override val autoSaveToDownloads: StateFlow<Boolean> =
+        MutableStateFlow(prefs.getBoolean(KEY_AUTO_SAVE, true))
+
+    override fun setAutoSave(value: Boolean) {
+        prefs.edit().putBoolean(KEY_AUTO_SAVE, value).apply()
+        (autoSaveToDownloads as MutableStateFlow).value = value
+    }
+
+    private companion object {
+        const val PREFS = "settings"
+        const val KEY_AUTO_SAVE = "auto_save_downloads"
+    }
+}
