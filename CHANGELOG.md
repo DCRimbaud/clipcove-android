@@ -2,6 +2,19 @@
 
 All notable changes to ClipCove are documented here.
 
+## [1.1.1] - 2026-10-26
+
+### Added
+
+- One-tap batch downloads for multi-image galleries.
+- Optional automatic parsing when a supported link is shared into ClipCove.
+- Backward-compatible platform metadata for favorites and backups.
+
+### Changed
+
+- Legacy Xiaohongshu favorites and raw 24-character note IDs are recognized as Xiaohongshu content.
+- Version bumped to `1.1.1` (`versionCode` 17).
+
 ## [1.1.0] - 2026-10-26
 
 ### Added

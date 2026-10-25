@@ -68,6 +68,7 @@ import com.douyin.core.designsystem.DySurfaceHigh
 import com.douyin.core.designsystem.DyText
 import com.douyin.core.designsystem.DyTextSecondary
 import com.douyin.core.designsystem.DyTextTertiary
+import com.douyin.core.model.MediaImage
 import com.douyin.core.model.MediaInfo
 import com.douyin.core.model.ParseFailure
 import com.douyin.data.history.HistoryItem
@@ -84,6 +85,7 @@ fun HomeScreen(
     result: MediaInfo?,
     history: List<HistoryItem>,
     onDownload: (String, String, String) -> Unit,
+    onDownloadGallery: (String, String, List<MediaImage>) -> Unit,
     onMerge: (String, String, String) -> Unit,
     onHistoryClick: (HistoryItem) -> Unit,
     clipboardSuggestion: String? = null,
@@ -140,6 +142,7 @@ fun HomeScreen(
                         ResultCard(
                             media = result,
                             onDownload = onDownload,
+                            onDownloadGallery = onDownloadGallery,
                             onMerge = onMerge,
                             isFavorite = isFavorite,
                             onToggleFavorite = onToggleFavorite,

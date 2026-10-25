@@ -10,5 +10,9 @@ interface SettingsRepository {
     /** 下载完成自动保存到公共「下载」目录 */
     val autoSaveToDownloads: StateFlow<Boolean>
 
+    /** Auto-parse links received through Android's share sheet. */
+    val autoParseSharedLinks: StateFlow<Boolean>
+
     fun setAutoSave(value: Boolean)
+    fun setAutoParseSharedLinks(value: Boolean)
 }

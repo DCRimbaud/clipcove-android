@@ -1,6 +1,7 @@
 package com.douyin.data.favorites
 
 import android.content.Context
+import com.douyin.core.model.MediaPlatform
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -21,6 +22,9 @@ class PrefsFavoritesRepository(context: Context) : FavoritesRepository {
                     cover = o.getString("cover"),
                     time = o.getLong("time"),
                     sourceUrl = o.optString("sourceUrl"),
+                    platform = o.optString("platform")
+                        .takeIf { it.isNotBlank() }
+                        ?.let { value -> runCatching { MediaPlatform.valueOf(value) }.getOrNull() },
                 )
             }
         } catch (e: Exception) {
@@ -50,14 +54,14 @@ class PrefsFavoritesRepository(context: Context) : FavoritesRepository {
     private fun save(list: List<FavoriteItem>) {
         val arr = JSONArray()
         list.forEach {
-            arr.put(
-                JSONObject()
-                    .put("awemeId", it.awemeId)
-                    .put("title", it.title)
-                    .put("cover", it.cover)
-                    .put("time", it.time)
-                    .put("sourceUrl", it.sourceUrl)
-            )
+            val json = JSONObject()
+                .put("awemeId", it.awemeId)
+                .put("title", it.title)
+                .put("cover", it.cover)
+                .put("time", it.time)
+                .put("sourceUrl", it.sourceUrl)
+            it.platform?.let { platform -> json.put("platform", platform.name) }
+            arr.put(json)
         }
         prefs.edit().putString(KEY, arr.toString()).apply()
     }

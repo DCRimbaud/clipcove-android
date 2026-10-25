@@ -31,6 +31,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Description
@@ -91,6 +92,7 @@ import java.io.File
 @Composable
 fun SettingsScreen(viewModel: SettingsViewModel) {
     val autoSave by viewModel.autoSave.collectAsStateWithLifecycle()
+    val autoParseSharedLinks by viewModel.autoParseSharedLinks.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     val wifiRunning by viewModel.wifiRunning.collectAsStateWithLifecycle()
     val wifiUrl by viewModel.wifiUrl.collectAsStateWithLifecycle()
@@ -144,6 +146,25 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                     Switch(
                         checked = autoSave,
                         onCheckedChange = viewModel::setAutoSave,
+                        colors = SwitchDefaults.colors(
+                            checkedTrackColor = DyRed,
+                            checkedThumbColor = Color.White,
+                            uncheckedTrackColor = DyInput,
+                            uncheckedThumbColor = DyTextSecondary,
+                        ),
+                    )
+                },
+            )
+            HorizontalDivider(color = DyBorder.copy(alpha = 0.6f))
+            SettingRow(
+                icon = Icons.Filled.ContentPaste,
+                tint = DyCyan,
+                title = "分享链接自动解析",
+                description = "从其他 App 分享链接到 ClipCove 后立即开始解析。",
+                trailing = {
+                    Switch(
+                        checked = autoParseSharedLinks,
+                        onCheckedChange = viewModel::setAutoParseSharedLinks,
                         colors = SwitchDefaults.colors(
                             checkedTrackColor = DyRed,
                             checkedThumbColor = Color.White,

@@ -1,5 +1,7 @@
 package com.douyin.data.favorites
 
+import com.douyin.core.model.MediaPlatform
+
 /** 收藏条目 */
 data class FavoriteItem(
     val awemeId: String,
@@ -7,6 +9,7 @@ data class FavoriteItem(
     val cover: String,
     val time: Long,
     val sourceUrl: String = "",
+    val platform: MediaPlatform? = null,
 )
 
 /** 收藏仓库接口 */

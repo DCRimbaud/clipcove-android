@@ -9,9 +9,9 @@ plugins {
 // Stable releases use 1.x.x; reserve 2.x.x for a major architecture change.
 val versionMajor = 1
 val versionMinor = 1
-val versionPatch = 0
+val versionPatch = 1
 val appVersionName = "$versionMajor.$versionMinor.$versionPatch"
-val appVersionCode = 16
+val appVersionCode = 17
 
 val keystorePropertiesFile = rootProject.file("keystore.properties")
 val keystoreProperties = Properties().apply {

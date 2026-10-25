@@ -57,6 +57,7 @@ import com.douyin.core.designsystem.DyRed
 import com.douyin.core.designsystem.DyText
 import com.douyin.core.designsystem.DyTextSecondary
 import com.douyin.core.designsystem.DyTheme
+import com.douyin.core.model.MediaPlatform
 import com.douyin.data.download.DownloadRepository
 import com.douyin.data.favorites.FavoritesRepository
 import com.douyin.feature.downloads.DownloadsScreen
@@ -198,6 +199,7 @@ private fun DyNavHost(
                     result = result,
                     history = history,
                     onDownload = vm::enqueueDownload,
+                    onDownloadGallery = vm::enqueueGallery,
                     onMerge = vm::mergeVideo,
                     onHistoryClick = { item ->
                         val target = if (item.sourceUrl.isNotEmpty()) item.sourceUrl else item.awemeId
@@ -228,7 +230,15 @@ private fun DyNavHost(
             composable("favorites") {
                 val vm: com.douyin.feature.home.HomeViewModel = koinViewModel()
                 FavoritesScreen(favoritesRepository) { item ->
-                    val target = item.sourceUrl.ifBlank { item.awemeId }
+                    val target = item.sourceUrl.ifBlank {
+                        val isXhs = item.platform == MediaPlatform.XIAOHONGSHU ||
+                            item.awemeId.matches(Regex("""(?i)[a-f0-9]{24}"""))
+                        if (isXhs) {
+                            "https://www.xiaohongshu.com/explore/${item.awemeId}"
+                        } else {
+                            item.awemeId
+                        }
+                    }
                     vm.onInputChange(target)
                     vm.parse()
                     navController.navigate("home") {
