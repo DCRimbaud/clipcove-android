@@ -10,6 +10,17 @@ ClipCove uses semantic versions:
 
 Update `versionMajor`, `versionMinor`, `versionPatch`, and `appVersionCode` in `app/build.gradle.kts`. The version code must always increase.
 
+## Release Cadence
+
+Do not publish a new public version for every development commit. Batch changes into one of these trains:
+
+- Patch release: fixes only, after validation.
+- Minor release: a coherent group of new user-facing features.
+- Release candidate: use `X.Y.Z-rc.N` to validate the update chain and collect feedback before promoting the same feature set to `X.Y.Z`.
+- Emergency release: security or install-blocking fixes only.
+
+Avoid multiple public tags in one day unless a release is broken. Prefer one release candidate, a short validation window, then one final release.
+
 ## Release Signing
 
 Official APKs must not use the Android debug key.

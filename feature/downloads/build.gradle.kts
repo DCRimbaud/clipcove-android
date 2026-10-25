@@ -27,4 +27,5 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.koin.androidx.compose)
     implementation(libs.koin.core)
+    testImplementation(libs.junit)
 }

@@ -15,6 +15,7 @@ android {
 }
 dependencies {
     implementation(project(":core:designsystem"))
+    implementation(project(":core:model"))
     implementation(project(":data:favorites"))
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
