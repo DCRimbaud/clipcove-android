@@ -2,7 +2,7 @@ name: Android CI
 
 on:
   push:
-    branches: [ main, "refactor/**" ]
+    branches: [ main, "feature/**", "refactor/**" ]
   pull_request:
 
 permissions:

@@ -1,6 +1,7 @@
 package com.douyin.parser
 
 import com.chaquo.python.android.PyApplication
+import com.douyin.core.common.diagnostics.DiagnosticsRepository
 import com.douyin.data.douyin.DouyinRepository
 import com.douyin.data.download.AndroidDownloadRepository
 import com.douyin.data.download.DownloadRepository
@@ -13,6 +14,8 @@ import com.douyin.data.settings.SettingsRepository
 import com.douyin.data.favorites.FavoritesRepository
 import com.douyin.data.favorites.PrefsFavoritesRepository
 import com.douyin.data.transfer.WifiTransferServer
+import com.douyin.data.update.GitHubUpdateRepository
+import com.douyin.data.update.UpdateRepository
 import com.douyin.data.xhs.XhsRepository
 import com.douyin.feature.home.HomeViewModel
 import com.douyin.feature.settings.SettingsViewModel
@@ -33,6 +36,8 @@ val appModule = module {
     single<VideoMerger> { FfmpegVideoMerger() }
     single<SettingsRepository> { PrefsSettingsRepository(androidContext()) }
     single<FavoritesRepository> { PrefsFavoritesRepository(androidContext()) }
+    single<DiagnosticsRepository> { PrefsDiagnosticsRepository(androidContext()) }
+    single<UpdateRepository> { GitHubUpdateRepository() }
     single { WifiTransferServer(androidContext()) }
     single { WifiTransferController(get()) }
 
@@ -46,12 +51,15 @@ val appModule = module {
             get(),
             get(),
             get(),
+            get(),
             androidApplication()
         )
     }
 
     viewModel {
         SettingsViewModel(
+            get(),
+            get(),
             get(),
             get(),
             get(),

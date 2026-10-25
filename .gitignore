@@ -9,6 +9,8 @@ captures/
 *.aab
 *.jks
 *.keystore
+*.bks
+*.p12
 keystore.properties
 secrets.properties
 

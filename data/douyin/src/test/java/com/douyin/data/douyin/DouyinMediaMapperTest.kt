@@ -3,7 +3,9 @@ package com.douyin.data.douyin
 import com.douyin.core.model.MediaPlatform
 import com.douyin.core.model.ParseFailureType
 import com.douyin.core.model.ParseResult
+import com.douyin.core.model.VideoSourceKind
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -36,8 +38,29 @@ class DouyinMediaMapperTest {
         assertEquals("7345492945006595379", media.id)
         assertEquals("https://example.com/video.mp4", media.videoUrl)
         assertEquals(1, media.videoCandidates.size)
+        assertEquals(VideoSourceKind.TRANSCODED, media.videoCandidates.single().sourceKind)
+        assertFalse(media.videoCandidates.single().watermarkRisk)
         assertEquals(10L, media.stats.diggCount)
         assertTrue(media.hasVideo)
+    }
+
+    @Test
+    fun `creates a typed candidate when only play url is present`() {
+        val result = DouyinMediaMapper.fromPythonJson(
+            """
+            {
+              "aweme_id":"7345492945006595379",
+              "title":"Fallback",
+              "play_url":"https://example.com/fallback.mp4",
+              "images":[]
+            }
+            """.trimIndent()
+        )
+
+        val media = (result as ParseResult.Success).media
+        assertEquals("https://example.com/fallback.mp4", media.videoUrl)
+        assertEquals(1, media.videoCandidates.size)
+        assertEquals(VideoSourceKind.TRANSCODED, media.videoCandidates.single().sourceKind)
     }
 
     @Test

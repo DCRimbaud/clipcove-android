@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-The current maintained line is `1.0.x`. If a vulnerability also affects older versions, include the affected versions in your report.
+The current maintained line is `1.1.x`. If a vulnerability also affects older versions, include the affected versions in your report.
 
 ## Reporting a Vulnerability
 

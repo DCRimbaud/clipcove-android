@@ -1,28 +1,47 @@
 package com.douyin.feature.settings
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.douyin.core.common.diagnostics.DiagnosticsRepository
 import com.douyin.data.download.DownloadRepository
 import com.douyin.data.favorites.FavoritesRepository
 import com.douyin.data.history.HistoryRepository
 import com.douyin.data.settings.SettingsRepository
+import com.douyin.data.update.AppRelease
+import com.douyin.data.update.ReleaseSelector
+import com.douyin.data.update.UpdateRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 
-/** 设置页 ViewModel:配置读写 + 清空操作 + WiFi 传输 + 导出备份 + 版本信息 */
+sealed interface UpdateUiState {
+    data object Idle : UpdateUiState
+    data object Checking : UpdateUiState
+    data object UpToDate : UpdateUiState
+    data class Available(val release: AppRelease) : UpdateUiState
+    data class Failed(val message: String) : UpdateUiState
+}
+
+/** Settings coordinator for preferences, local data, diagnostics, and update checks. */
 class SettingsViewModel(
     private val settingsRepo: SettingsRepository,
     private val historyRepo: HistoryRepository,
     private val downloadRepo: DownloadRepository,
     private val favoritesRepo: FavoritesRepository,
+    private val diagnosticsRepo: DiagnosticsRepository,
+    private val updateRepository: UpdateRepository,
     val wifiTransfer: WifiTransferController,
     val versionName: String,
-    val versionCode: Int
+    val versionCode: Int,
 ) : ViewModel() {
 
     val autoSave: StateFlow<Boolean> = settingsRepo.autoSaveToDownloads
 
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message
+
+    private val _updateState = MutableStateFlow<UpdateUiState>(UpdateUiState.Idle)
+    val updateState: StateFlow<UpdateUiState> = _updateState
 
     val wifiRunning: StateFlow<Boolean> = wifiTransfer.running
     val wifiUrl: StateFlow<String> = wifiTransfer.url
@@ -37,7 +56,7 @@ class SettingsViewModel(
         _message.value = when {
             ok && wifiTransfer.running.value -> "WiFi 传输已开启"
             ok -> "WiFi 传输已关闭"
-            else -> "启动失败,请检查网络"
+            else -> "启动失败，请检查网络"
         }
     }
 
@@ -47,34 +66,69 @@ class SettingsViewModel(
     }
 
     fun clearDownloads() {
-        downloadRepo.tasks.value.forEach { downloadRepo.remove(it) }
+        downloadRepo.tasks.value.toList().forEach(downloadRepo::remove)
         _message.value = "下载列表已清空"
     }
 
-    /** 导出备份(历史 + 收藏),返回 JSON 字符串 */
-    fun exportData(): String {
-        val arr = org.json.JSONArray()
-        historyRepo.load().forEach {
-            arr.put(
-                org.json.JSONObject()
-                    .put("type", "history")
-                    .put("awemeId", it.awemeId)
-                    .put("title", it.title)
-                    .put("cover", it.cover)
-                    .put("time", it.time)
-            )
+    fun clearDiagnostics() {
+        diagnosticsRepo.clear()
+        _message.value = "诊断记录已清空"
+    }
+
+    fun clearAllLocalData() {
+        downloadRepo.tasks.value.toList().forEach(downloadRepo::remove)
+        historyRepo.clear()
+        favoritesRepo.clear()
+        diagnosticsRepo.clear()
+        _message.value = "历史、收藏、下载记录和诊断信息已清空"
+    }
+
+    /** Export a versioned backup containing history, favorites, and source URLs. */
+    fun exportData(): String = BackupCodec.encode(
+        history = historyRepo.load(),
+        favorites = favoritesRepo.load(),
+        appVersion = versionName,
+    )
+
+    /**
+     * Restore old flat-array backups and the current versioned format.
+     * Restore is additive: existing entries are merged by stable media ID.
+     */
+    fun importData(raw: String) {
+        try {
+            val payload = BackupCodec.decode(raw)
+            payload.history.forEach(historyRepo::add)
+            payload.favorites.forEach(favoritesRepo::add)
+            val total = payload.history.size + payload.favorites.size
+            _message.value = if (total == 0) {
+                "备份格式有效，但没有可恢复的数据"
+            } else {
+                "还原完成：${payload.history.size} 条历史，${payload.favorites.size} 条收藏"
+            }
+        } catch (e: IllegalArgumentException) {
+            _message.value = "还原失败：${e.message ?: "文件格式不支持"}"
+        } catch (e: Exception) {
+            _message.value = "还原失败：无法读取备份文件"
         }
-        favoritesRepo.load().forEach {
-            arr.put(
-                org.json.JSONObject()
-                    .put("type", "favorite")
-                    .put("awemeId", it.awemeId)
-                    .put("title", it.title)
-                    .put("cover", it.cover)
-                    .put("time", it.time)
-            )
+    }
+
+    fun exportDiagnostics(): String = diagnosticsRepo.exportReport(versionName, versionCode)
+
+    fun checkForUpdate() {
+        if (_updateState.value == UpdateUiState.Checking) return
+        _updateState.value = UpdateUiState.Checking
+        viewModelScope.launch {
+            _updateState.value = try {
+                val latest = ReleaseSelector.newest(updateRepository.getReleases(), versionName)
+                if (latest == null) UpdateUiState.UpToDate else UpdateUiState.Available(latest)
+            } catch (e: Exception) {
+                UpdateUiState.Failed(e.message ?: "检查更新失败，请稍后重试")
+            }
         }
-        return arr.toString(2)
+    }
+
+    fun reportFileReadError() {
+        _message.value = "无法读取所选文件，请重新选择"
     }
 
     fun consumeMessage() {

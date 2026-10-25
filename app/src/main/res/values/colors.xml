@@ -1,13 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="dy_bg">#0B0D11</color>
-    <color name="dy_bg_card">#151820</color>
-    <color name="dy_bg_input">#12151B</color>
     <color name="dy_red">#FF466C</color>
-    <color name="dy_cyan">#66E3DF</color>
-    <color name="dy_text">#F7F8FA</color>
-    <color name="dy_text_secondary">#9AA1AE</color>
-    <color name="dy_border">#2A2F3A</color>
-    <color name="dy_green">#4ADE80</color>
-    <color name="dy_amber">#F6C453</color>
 </resources>

@@ -5,7 +5,8 @@ data class FavoriteItem(
     val awemeId: String,
     val title: String,
     val cover: String,
-    val time: Long
+    val time: Long,
+    val sourceUrl: String = "",
 )
 
 /** 收藏仓库接口 */

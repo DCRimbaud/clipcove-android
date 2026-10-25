@@ -2,6 +2,7 @@ package com.douyin.parser
 
 import android.util.Log
 import com.chaquo.python.Python
+import com.douyin.core.common.diagnostics.DiagnosticSanitizer
 import com.douyin.core.model.ParseFailure
 import com.douyin.core.model.ParseFailureType
 import com.douyin.core.model.ParseResult
@@ -21,7 +22,11 @@ class ChaquopyDouyinRepository : DouyinRepository {
                 .toString()
             DouyinMediaMapper.fromPythonJson(raw)
         } catch (e: Exception) {
-            Log.e(TAG, "Douyin Python resolver failed", e)
+            Log.e(
+                TAG,
+                "Douyin Python resolver failed: ${e::class.java.simpleName}: " +
+                    DiagnosticSanitizer.sanitize(e.message),
+            )
             ParseResult.Failure(
                 ParseFailure(
                     type = ParseFailureType.UNKNOWN,
