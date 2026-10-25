@@ -87,6 +87,7 @@ import com.douyin.core.designsystem.DyRed
 import com.douyin.core.designsystem.DySectionHeader
 import com.douyin.core.designsystem.DyText
 import com.douyin.core.designsystem.DyTextSecondary
+import com.douyin.data.update.AppRelease
 import java.io.File
 
 @Composable
@@ -97,6 +98,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
     val wifiRunning by viewModel.wifiRunning.collectAsStateWithLifecycle()
     val wifiUrl by viewModel.wifiUrl.collectAsStateWithLifecycle()
     val updateState by viewModel.updateState.collectAsStateWithLifecycle()
+    val updateRelease = updateState.pendingRelease()
     val context = LocalContext.current
     var showChangelog by remember { mutableStateOf(false) }
     var showClearAllConfirm by remember { mutableStateOf(false) }
@@ -279,14 +281,25 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 title = updateActionTitle(updateState),
                 description = updateActionDescription(updateState),
                 onClick = {
-                    val release = (updateState as? UpdateUiState.Available)?.release
-                    if (release != null) {
-                        openReleasePage(context, release.htmlUrl)
-                    } else {
-                        viewModel.checkForUpdate()
+                    if (updateState is UpdateUiState.Downloading) return@ActionRow
+                    when {
+                        updateRelease?.hasInstallableAssets() == true ->
+                            viewModel.downloadAndInstallUpdate()
+                        updateRelease != null -> openReleasePage(context, updateRelease.htmlUrl)
+                        else -> viewModel.checkForUpdate()
                     }
                 },
             )
+            if (updateRelease != null) {
+                HorizontalDivider(color = DyBorder.copy(alpha = 0.6f))
+                ActionRow(
+                    icon = Icons.Filled.Description,
+                    tint = DyCyan,
+                    title = "查看发布说明",
+                    description = "在 GitHub 查看更新内容或手动下载",
+                    onClick = { openReleasePage(context, updateRelease.htmlUrl) },
+                )
+            }
         }
 
         SettingsSection(title = "关于 ClipCove") {
@@ -443,20 +456,55 @@ private fun ActionRow(
     }
 }
 
+private fun UpdateUiState.pendingRelease(): AppRelease? = when (this) {
+    is UpdateUiState.Available -> release
+    is UpdateUiState.Downloading -> release
+    is UpdateUiState.PermissionRequired -> release
+    is UpdateUiState.InstallReady -> release
+    is UpdateUiState.Failed -> release
+    else -> null
+}
+
+private fun AppRelease.hasInstallableAssets(): Boolean =
+    assets.any { it.name.endsWith(".apk", ignoreCase = true) } &&
+        assets.any { it.name.endsWith(".sha256", ignoreCase = true) }
+
+private fun AppRelease.apkSizeBytes(): Long =
+    assets.firstOrNull { it.name.endsWith(".apk", ignoreCase = true) }?.sizeBytes ?: 0L
+
 private fun updateActionTitle(state: UpdateUiState): String = when (state) {
     UpdateUiState.Idle -> "检查更新"
     UpdateUiState.Checking -> "正在检查更新"
     UpdateUiState.UpToDate -> "已是最新版本"
     is UpdateUiState.Available -> "发现新版本 ${state.release.tagName}"
-    is UpdateUiState.Failed -> "重新检查更新"
+    is UpdateUiState.Downloading -> "正在下载更新 ${state.progress}%"
+    is UpdateUiState.PermissionRequired -> "需要安装权限"
+    is UpdateUiState.InstallReady -> "安装器已打开"
+    is UpdateUiState.Failed -> if (state.release != null) "更新失败，点按重试" else "重新检查更新"
 }
 
 private fun updateActionDescription(state: UpdateUiState): String = when (state) {
     UpdateUiState.Idle -> "手动查询 GitHub Releases，不会在后台自动访问"
     UpdateUiState.Checking -> "正在连接 GitHub，请稍候…"
     UpdateUiState.UpToDate -> "当前版本已是 GitHub 上可用的最新版本"
-    is UpdateUiState.Available -> "点按前往 GitHub 下载页查看发布说明和安装包"
-    is UpdateUiState.Failed -> "检查失败：${state.message.take(100)}，点按重试"
+    is UpdateUiState.Available -> {
+        val size = state.release.apkSizeBytes()
+        val sizeHint = if (size > 0) "（约 ${formatUpdateSize(size)}）" else ""
+        "点按自动下载并校验 APK$sizeHint，随后打开系统安装器。建议连接 WiFi。"
+    }
+    is UpdateUiState.Downloading -> "正在应用内下载更新，请保持网络连接。"
+    is UpdateUiState.PermissionRequired -> "请在系统页面允许 ClipCove 安装未知应用，然后返回本页再次点按。"
+    is UpdateUiState.InstallReady -> "请按系统安装页提示完成升级；页面关闭后可再次点按。"
+    is UpdateUiState.Failed -> {
+        val retry = if (state.release != null) "点按重试。" else "点按重新检查。"
+        "${state.message.take(120)}。$retry"
+    }
+}
+
+private fun formatUpdateSize(bytes: Long): String = when {
+    bytes >= 1024L * 1024L -> "%.1f MB".format(bytes / (1024.0 * 1024.0))
+    bytes >= 1024L -> "%.0f KB".format(bytes / 1024.0)
+    else -> "$bytes B"
 }
 
 private fun openReleasePage(context: Context, url: String) {

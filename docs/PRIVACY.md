@@ -19,6 +19,7 @@ Network requests are made only to support user actions:
 - Douyin and Xiaohongshu page/media hosts when parsing or downloading
 - Image and media CDNs when displaying previews
 - GitHub Releases when the user manually taps **Check for updates**
+- GitHub release assets when the user confirms an in-app update download
 - Local WiFi transfer only while the user has enabled it
 
 As with any network request, platform servers and GitHub can observe the device IP address and request metadata. ClipCove does not send history, favorites, or diagnostics to those services.
@@ -32,6 +33,10 @@ Diagnostics record parser category, sanitized error text, timestamp, app version
 - Sensitive query parameters and bearer tokens
 
 Diagnostics are bounded and can be cleared from Settings. Sanitization is best-effort; users should still inspect a report before sharing it publicly.
+
+## In-App Updates
+
+When the user chooses to install an available update, ClipCove downloads the APK and checksum from the public GitHub Release. It verifies the file size, SHA-256 checksum, package name, version code, version name, and signing certificate before opening Android's package installer. Android requires the user to grant install permission and confirm the final installation step.
 
 ## Backups
 
