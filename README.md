@@ -15,6 +15,8 @@ ClipCove is a local-first Android media downloader for **Douyin** and **Xiaohong
 - Xiaohongshu original-file priority via `originVideoKey`, with transparent transcoded fallback metadata
 - Download-quality selection with resolution, size, bitrate, and watermark-risk labels
 - One-tap batch downloads for multi-image galleries
+- Download search, status filters, and confirmed cleanup for completed tasks
+- Favorites search and one-tap source-link copying
 - Optional auto-parse when a share link is sent to ClipCove
 - Resumable downloads with pause, continue, retry, and foreground notifications
 - Local favorites and history that retain source URLs for reliable re-resolution

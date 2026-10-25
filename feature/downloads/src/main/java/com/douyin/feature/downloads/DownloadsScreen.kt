@@ -10,6 +10,7 @@ import android.os.Environment
 import android.provider.MediaStore
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -24,14 +25,24 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -71,6 +82,11 @@ fun DownloadsScreen(repository: DownloadRepository) {
             it.status == DownloadStatus.PAUSED
     }
     val completedCount = tasks.count { it.status == DownloadStatus.DONE }
+    val failedCount = tasks.count { it.status == DownloadStatus.FAILED }
+    var query by remember { mutableStateOf("") }
+    var filter by remember { mutableStateOf(DownloadFilter.ALL) }
+    var confirmClearCompleted by remember { mutableStateOf(false) }
+    val filteredTasks = DownloadTaskFilter.apply(tasks, query, filter)
 
     Column(
         modifier = Modifier.fillMaxSize().padding(start = 18.dp, end = 18.dp, top = 14.dp),
@@ -98,16 +114,131 @@ fun DownloadsScreen(repository: DownloadRepository) {
                 }
             }
             Spacer(Modifier.height(14.dp))
-            LazyColumn(
-                modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(bottom = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                items(tasks, key = { it.id }) { task ->
-                    DownloadCard(task = task, repository = repository)
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                placeholder = { Text("搜索标题或文件名", color = DyTextSecondary) },
+                leadingIcon = {
+                    Icon(Icons.Filled.Search, contentDescription = null, tint = DyTextSecondary)
+                },
+                trailingIcon = {
+                    if (query.isNotBlank()) {
+                        IconButton(onClick = { query = "" }) {
+                            Icon(Icons.Filled.Close, contentDescription = "清空搜索", tint = DyTextSecondary)
+                        }
+                    }
+                },
+                shape = RoundedCornerShape(16.dp),
+                textStyle = MaterialTheme.typography.bodyMedium,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = DyText,
+                    unfocusedTextColor = DyText,
+                    focusedBorderColor = DyCyan.copy(alpha = 0.75f),
+                    unfocusedBorderColor = DyBorder,
+                    focusedContainerColor = DyInput,
+                    unfocusedContainerColor = DyInput,
+                    cursorColor = DyCyan,
+                ),
+            )
+            Spacer(Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                DownloadFilter.entries.forEach { option ->
+                    FilterChip(
+                        label = when (option) {
+                            DownloadFilter.ACTIVE -> "进行中 ${activeCount}"
+                            DownloadFilter.DONE -> "已完成 ${completedCount}"
+                            DownloadFilter.FAILED -> "失败 ${failedCount}"
+                            DownloadFilter.ALL -> "全部 ${tasks.size}"
+                        },
+                        selected = filter == option,
+                        modifier = Modifier.weight(1f),
+                        onClick = { filter = option },
+                    )
+                }
+            }
+            if (completedCount > 0 && filter == DownloadFilter.DONE) {
+                Spacer(Modifier.height(4.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = { confirmClearCompleted = true }) {
+                        Text("清理已完成", color = DyRed, fontSize = 12.sp)
+                    }
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            if (filteredTasks.isEmpty()) {
+                DyPanel(contentPadding = 16.dp) {
+                    Text(
+                        if (query.isBlank()) "当前分类没有下载任务" else "没有匹配“$query”的下载任务",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = DyTextSecondary,
+                    )
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(bottom = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    items(filteredTasks, key = { it.id }) { task ->
+                        DownloadCard(task = task, repository = repository)
+                    }
                 }
             }
         }
+    }
+
+    if (confirmClearCompleted) {
+        AlertDialog(
+            onDismissRequest = { confirmClearCompleted = false },
+            containerColor = DyCard,
+            title = { Text("清理已完成任务？", color = DyText) },
+            text = {
+                Text(
+                    "会删除应用内保存的 $completedCount 个已完成文件；已经另存到系统下载目录的副本不会受影响。",
+                    color = DyTextSecondary,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirmClearCompleted = false
+                        tasks.filter { it.status == DownloadStatus.DONE }.forEach(repository::remove)
+                        if (filter == DownloadFilter.DONE) filter = DownloadFilter.ALL
+                    },
+                ) { Text("清理", color = DyRed) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmClearCompleted = false }) {
+                    Text("取消", color = DyTextSecondary)
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun FilterChip(
+    label: String,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Surface(
+        modifier = modifier.clickable(onClick = onClick),
+        shape = RoundedCornerShape(12.dp),
+        color = if (selected) DyCyan.copy(alpha = 0.15f) else DyInput,
+        border = BorderStroke(1.dp, if (selected) DyCyan.copy(alpha = 0.65f) else DyBorder),
+    ) {
+        Text(
+            label,
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 8.dp),
+            style = MaterialTheme.typography.bodySmall,
+            color = if (selected) DyCyan else DyTextSecondary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -222,7 +353,7 @@ private fun DownloadStatus.statusColor(): Color = when (this) {
 
 private fun openDownloaded(context: Context, task: DownloadTask) {
     try {
-        val uri = queryDownloadUri(context, task.filename) ?: throw RuntimeException("文件不存在，请先另存")
+        val uri = taskFileUri(context, task) ?: throw RuntimeException("文件不存在")
         val intent = Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, guessMime(task.filename))
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -235,7 +366,7 @@ private fun openDownloaded(context: Context, task: DownloadTask) {
 
 private fun shareDownloaded(context: Context, task: DownloadTask) {
     try {
-        val uri = queryDownloadUri(context, task.filename) ?: throw RuntimeException("文件不存在，请先另存")
+        val uri = taskFileUri(context, task) ?: throw RuntimeException("文件不存在")
         val intent = Intent(Intent.ACTION_SEND).apply {
             type = guessMime(task.filename)
             putExtra(Intent.EXTRA_STREAM, uri)
@@ -287,6 +418,18 @@ private fun saveToDownloads(context: Context, task: DownloadTask) {
 
 private fun runOnUiThread(context: Context, block: () -> Unit) {
     (context as? android.app.Activity)?.runOnUiThread { block() } ?: block()
+}
+
+private fun taskFileUri(context: Context, task: DownloadTask): Uri? {
+    val privateFile = task.filePath.takeIf { it.isNotBlank() }?.let(::File)
+    if (privateFile?.isFile == true) {
+        return FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            privateFile,
+        )
+    }
+    return queryDownloadUri(context, task.filename)
 }
 
 private fun queryDownloadUri(context: Context, filename: String): Uri? {

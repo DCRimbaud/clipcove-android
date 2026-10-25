@@ -2,6 +2,23 @@
 
 All notable changes to ClipCove are documented here.
 
+## [1.2.0-rc.1] - 2026-10-26
+
+### Added
+
+- Search and status filters for download tasks.
+- Bulk cleanup for completed download tasks with confirmation.
+- Favorites search by title, platform ID, or source URL.
+- Copy source links directly from favorite cards.
+
+### Fixed
+
+- Open and share completed downloads directly from app-private storage without requiring a public copy first.
+
+### Changed
+
+- Version name set to `1.2.0-rc.1` (`versionCode` 19) as a release candidate for update-chain testing.
+
 ## [1.1.2] - 2026-10-26
 
 ### Added
