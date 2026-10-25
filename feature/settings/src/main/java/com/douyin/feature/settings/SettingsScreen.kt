@@ -94,6 +94,7 @@ import java.io.File
 fun SettingsScreen(viewModel: SettingsViewModel) {
     val autoSave by viewModel.autoSave.collectAsStateWithLifecycle()
     val autoParseSharedLinks by viewModel.autoParseSharedLinks.collectAsStateWithLifecycle()
+    val autoUpdateMirrors by viewModel.autoUpdateMirrors.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     val wifiRunning by viewModel.wifiRunning.collectAsStateWithLifecycle()
     val wifiUrl by viewModel.wifiUrl.collectAsStateWithLifecycle()
@@ -167,6 +168,25 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                     Switch(
                         checked = autoParseSharedLinks,
                         onCheckedChange = viewModel::setAutoParseSharedLinks,
+                        colors = SwitchDefaults.colors(
+                            checkedTrackColor = DyRed,
+                            checkedThumbColor = Color.White,
+                            uncheckedTrackColor = DyInput,
+                            uncheckedThumbColor = DyTextSecondary,
+                        ),
+                    )
+                },
+            )
+            HorizontalDivider(color = DyBorder.copy(alpha = 0.6f))
+            SettingRow(
+                icon = Icons.Filled.SystemUpdate,
+                tint = DyGreen,
+                title = "更新加速线路",
+                description = "GitHub 直连失败时自动尝试公共加速线路；安装包仍会校验签名和 SHA-256。",
+                trailing = {
+                    Switch(
+                        checked = autoUpdateMirrors,
+                        onCheckedChange = viewModel::setAutoUpdateMirrors,
                         colors = SwitchDefaults.colors(
                             checkedTrackColor = DyRed,
                             checkedThumbColor = Color.White,
@@ -279,7 +299,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 icon = Icons.Filled.SystemUpdate,
                 tint = DyCyan,
                 title = updateActionTitle(updateState),
-                description = updateActionDescription(updateState),
+                description = updateActionDescription(updateState, autoUpdateMirrors),
                 onClick = {
                     if (updateState is UpdateUiState.Downloading) return@ActionRow
                     when {
@@ -483,14 +503,15 @@ private fun updateActionTitle(state: UpdateUiState): String = when (state) {
     is UpdateUiState.Failed -> if (state.release != null) "更新失败，点按重试" else "重新检查更新"
 }
 
-private fun updateActionDescription(state: UpdateUiState): String = when (state) {
+private fun updateActionDescription(state: UpdateUiState, autoUpdateMirrors: Boolean): String = when (state) {
     UpdateUiState.Idle -> "手动查询 GitHub Releases，不会在后台自动访问"
     UpdateUiState.Checking -> "正在连接 GitHub，请稍候…"
     UpdateUiState.UpToDate -> "当前版本已是 GitHub 上可用的最新版本"
     is UpdateUiState.Available -> {
         val size = state.release.apkSizeBytes()
         val sizeHint = if (size > 0) "（约 ${formatUpdateSize(size)}）" else ""
-        "点按自动下载并校验 APK$sizeHint，随后打开系统安装器。建议连接 WiFi。"
+        val routeHint = if (autoUpdateMirrors) "GitHub 直连失败时会自动切换加速线路。" else ""
+        "点按自动下载并校验 APK$sizeHint，随后打开系统安装器。建议连接 WiFi。$routeHint"
     }
     is UpdateUiState.Downloading -> "正在应用内下载更新，请保持网络连接。"
     is UpdateUiState.PermissionRequired -> "请在系统页面允许 ClipCove 安装未知应用，然后返回本页再次点按。"

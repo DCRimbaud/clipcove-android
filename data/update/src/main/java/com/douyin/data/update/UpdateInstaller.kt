@@ -8,6 +8,7 @@ sealed interface InstallResult {
 interface UpdateInstaller {
     suspend fun downloadAndInstall(
         release: AppRelease,
+        allowMirrors: Boolean,
         onProgress: (Int) -> Unit,
     ): InstallResult
 }
