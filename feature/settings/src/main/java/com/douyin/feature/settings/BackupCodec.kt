@@ -34,14 +34,14 @@ internal object BackupCodec {
 
         val favoritesArray = JSONArray()
         favorites.forEach { item ->
-            favoritesArray.put(
-                JSONObject()
-                    .put("awemeId", item.awemeId)
-                    .put("title", item.title)
-                    .put("cover", item.cover)
-                    .put("time", item.time)
-                    .put("sourceUrl", item.sourceUrl)
-            )
+            val json = JSONObject()
+                .put("awemeId", item.awemeId)
+                .put("title", item.title)
+                .put("cover", item.cover)
+                .put("time", item.time)
+                .put("sourceUrl", item.sourceUrl)
+            item.platform?.let { platform -> json.put("platform", platform.name) }
+            favoritesArray.put(json)
         }
 
         return JSONObject()
@@ -134,6 +134,9 @@ internal object BackupCodec {
             cover = optString("cover"),
             time = optLong("time").coerceAtLeast(0),
             sourceUrl = optString("sourceUrl"),
+            platform = optString("platform")
+                .takeIf { it.isNotBlank() }
+                ?.let { value -> runCatching { com.douyin.core.model.MediaPlatform.valueOf(value) }.getOrNull() },
         )
     }
 }

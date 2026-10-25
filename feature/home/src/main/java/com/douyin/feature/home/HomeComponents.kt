@@ -102,6 +102,7 @@ import java.util.Date
 internal fun ResultCard(
     media: MediaInfo,
     onDownload: (String, String, String) -> Unit,
+    onDownloadGallery: (String, String, List<MediaImage>) -> Unit,
     onMerge: (String, String, String) -> Unit,
     isFavorite: Boolean = false,
     onToggleFavorite: () -> Unit = {},
@@ -307,10 +308,28 @@ internal fun ResultCard(
                 }
                 if (media.images.isNotEmpty()) {
                     Spacer(Modifier.height(18.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(7.dp),
+                    ) {
                         Icon(Icons.Filled.Image, contentDescription = null, tint = DyTextSecondary, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(7.dp))
                         Text("图集 · ${media.images.size} 张", style = MaterialTheme.typography.titleMedium, color = DyText)
+                        Spacer(Modifier.weight(1f))
+                        if (media.images.size > 1) {
+                            TextButton(
+                                onClick = {
+                                    onDownloadGallery(title, media.id, media.images)
+                                },
+                            ) {
+                                Icon(
+                                    Icons.Filled.Download,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(15.dp),
+                                )
+                                Spacer(Modifier.width(4.dp))
+                                Text("下载全部", fontSize = 12.sp)
+                            }
+                        }
                     }
                     Spacer(Modifier.height(10.dp))
                     ImageGrid(

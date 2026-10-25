@@ -1,5 +1,6 @@
 package com.douyin.feature.settings
 
+import com.douyin.core.model.MediaPlatform
 import com.douyin.data.favorites.FavoriteItem
 import com.douyin.data.history.HistoryItem
 import org.json.JSONArray
@@ -14,7 +15,16 @@ class BackupCodecTest {
     fun `round trips versioned backup with source urls`() {
         val json = BackupCodec.encode(
             history = listOf(HistoryItem("h1", "History", "cover", 10, "https://xhs.link/h")),
-            favorites = listOf(FavoriteItem("f1", "Favorite", "cover", 20, "https://xhs.link/f")),
+            favorites = listOf(
+                FavoriteItem(
+                    awemeId = "f1",
+                    title = "Favorite",
+                    cover = "cover",
+                    time = 20,
+                    sourceUrl = "https://xhs.link/f",
+                    platform = MediaPlatform.XIAOHONGSHU,
+                )
+            ),
             exportedAt = 100,
             appVersion = "1.1.0",
         )
@@ -28,6 +38,7 @@ class BackupCodecTest {
         assertEquals("https://xhs.link/h", payload.history.single().sourceUrl)
         assertEquals(1, payload.favorites.size)
         assertEquals("https://xhs.link/f", payload.favorites.single().sourceUrl)
+        assertEquals(MediaPlatform.XIAOHONGSHU, payload.favorites.single().platform)
     }
 
     @Test

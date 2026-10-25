@@ -12,13 +12,22 @@ class PrefsSettingsRepository(context: Context) : SettingsRepository {
     override val autoSaveToDownloads: StateFlow<Boolean> =
         MutableStateFlow(prefs.getBoolean(KEY_AUTO_SAVE, true))
 
+    override val autoParseSharedLinks: StateFlow<Boolean> =
+        MutableStateFlow(prefs.getBoolean(KEY_AUTO_PARSE_SHARED, true))
+
     override fun setAutoSave(value: Boolean) {
         prefs.edit().putBoolean(KEY_AUTO_SAVE, value).apply()
         (autoSaveToDownloads as MutableStateFlow).value = value
     }
 
+    override fun setAutoParseSharedLinks(value: Boolean) {
+        prefs.edit().putBoolean(KEY_AUTO_PARSE_SHARED, value).apply()
+        (autoParseSharedLinks as MutableStateFlow).value = value
+    }
+
     private companion object {
         const val PREFS = "settings"
         const val KEY_AUTO_SAVE = "auto_save_downloads"
+        const val KEY_AUTO_PARSE_SHARED = "auto_parse_shared_links"
     }
 }

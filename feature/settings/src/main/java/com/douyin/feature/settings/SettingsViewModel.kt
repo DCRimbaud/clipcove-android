@@ -36,6 +36,7 @@ class SettingsViewModel(
 ) : ViewModel() {
 
     val autoSave: StateFlow<Boolean> = settingsRepo.autoSaveToDownloads
+    val autoParseSharedLinks: StateFlow<Boolean> = settingsRepo.autoParseSharedLinks
 
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message
@@ -49,6 +50,11 @@ class SettingsViewModel(
     fun setAutoSave(value: Boolean) {
         settingsRepo.setAutoSave(value)
         _message.value = if (value) "下载完成后将自动保存到「下载」目录" else "已关闭自动保存"
+    }
+
+    fun setAutoParseSharedLinks(value: Boolean) {
+        settingsRepo.setAutoParseSharedLinks(value)
+        _message.value = if (value) "分享链接导入后将自动解析" else "分享链接仅填入输入框"
     }
 
     fun toggleWifi() {

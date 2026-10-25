@@ -10,6 +10,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.douyin.core.common.diagnostics.DiagnosticSanitizer
 import com.douyin.core.common.diagnostics.DiagnosticsRepository
+import com.douyin.core.model.MediaImage
 import com.douyin.core.model.MediaInfo
 import com.douyin.core.model.ParseFailure
 import com.douyin.core.model.ParseFailureType
@@ -21,6 +22,7 @@ import com.douyin.data.favorites.FavoritesRepository
 import com.douyin.data.history.HistoryItem
 import com.douyin.data.history.HistoryRepository
 import com.douyin.data.merger.VideoMerger
+import com.douyin.data.settings.SettingsRepository
 import com.douyin.data.xhs.XhsRepository
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,6 +38,7 @@ class HomeViewModel(
     private val merger: VideoMerger,
     private val favoritesRepo: FavoritesRepository,
     private val diagnosticsRepo: DiagnosticsRepository,
+    private val settingsRepo: SettingsRepository,
     app: Application,
 ) : AndroidViewModel(app) {
 
@@ -134,6 +137,7 @@ class HomeViewModel(
                     cover = media.coverUrl,
                     time = System.currentTimeMillis(),
                     sourceUrl = lastSuccessSourceUrl,
+                    platform = media.platform,
                 )
             )
             _isFavorite.value = true
@@ -141,9 +145,16 @@ class HomeViewModel(
     }
 
     fun handleIntent(intent: Intent?) {
-        if (intent?.action == Intent.ACTION_SEND && intent.type?.startsWith("text/") == true) {
-            acceptIncoming(intent.getStringExtra(Intent.EXTRA_TEXT))
-        }
+        if (intent?.action != Intent.ACTION_SEND || intent.type?.startsWith("text/") != true) return
+        val clean = intent.getStringExtra(Intent.EXTRA_TEXT)
+            ?.trim()
+            ?.takeIf { it.length in 1..MAX_INPUT_LENGTH }
+            ?: return
+        if (!looksLikeSupportedLink(clean)) return
+        _input.value = clean
+        _error.value = null
+        _clipboardSuggestion.value = null
+        if (settingsRepo.autoParseSharedLinks.value) parse()
     }
 
     fun parse() {
@@ -231,6 +242,24 @@ class HomeViewModel(
         Toast.makeText(getApplication(), "已加入下载：$title", Toast.LENGTH_SHORT).show()
     }
 
+    fun enqueueGallery(title: String, mediaId: String, images: List<MediaImage>) {
+        val downloadable = images.filter { it.preferredUrl.isNotBlank() }
+        downloadable.forEachIndexed { index, image ->
+            downloadRepo.enqueue(
+                title = "${title}_原图${index + 1}",
+                filename = "${mediaId}_${index + 1}_原图.jpg",
+                url = image.preferredUrl,
+            )
+        }
+        if (downloadable.isNotEmpty()) {
+            Toast.makeText(
+                getApplication(),
+                "已加入 ${downloadable.size} 张原图下载",
+                Toast.LENGTH_SHORT,
+            ).show()
+        }
+    }
+
     fun mergeVideo(videoUrl: String, audioUrl: String, filename: String) {
         Toast.makeText(getApplication(), "开始合成：$filename", Toast.LENGTH_SHORT).show()
         merger.merge(getApplication(), videoUrl, audioUrl, filename) { success, message ->
@@ -264,7 +293,8 @@ class HomeViewModel(
         val normalized = input.lowercase()
         return if (normalized.contains("xiaohongshu.com") ||
             normalized.contains("xhslink.com") ||
-            normalized.contains("xhslink.cn")
+            normalized.contains("xhslink.cn") ||
+            input.matches(Regex("""(?i)[a-f0-9]{24}"""))
         ) {
             SourcePlatform.XIAOHONGSHU
         } else {
@@ -282,7 +312,8 @@ class HomeViewModel(
             normalized.contains("xiaohongshu.com") ||
             normalized.contains("xhslink.com") ||
             normalized.contains("xhslink.cn") ||
-            text.matches(Regex("""\d{15,20}"""))
+            text.matches(Regex("""\d{15,20}""")) ||
+            text.matches(Regex("""(?i)[a-f0-9]{24}"""))
     }
 
     private fun extractHttpUrl(text: String): String {
