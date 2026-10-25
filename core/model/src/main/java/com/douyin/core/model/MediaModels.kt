@@ -13,11 +13,25 @@ data class MediaStats(
     val shareCount: Long = 0,
 )
 
+enum class VideoSourceKind {
+    ORIGINAL,
+    TRANSCODED,
+    OTHER,
+}
+
 data class VideoCandidate(
     val label: String,
     val url: String,
     val bitrate: Long = 0,
-)
+    val width: Int = 0,
+    val height: Int = 0,
+    val sizeBytes: Long = 0,
+    val sourceKind: VideoSourceKind = VideoSourceKind.OTHER,
+    val watermarkRisk: Boolean = false,
+) {
+    val resolutionLabel: String
+        get() = if (width > 0 && height > 0) "${height}p · ${width}x${height}" else ""
+}
 
 data class MediaImage(
     val url: String,
@@ -53,4 +67,8 @@ data class MediaInfo(
     val hasVideo: Boolean get() = videoUrl.isNotBlank()
     val hasImages: Boolean get() = images.isNotEmpty()
     val hasMusic: Boolean get() = musicUrl.isNotBlank()
+
+    val preferredVideoCandidate: VideoCandidate?
+        get() = videoCandidates.firstOrNull { it.sourceKind == VideoSourceKind.ORIGINAL }
+            ?: videoCandidates.firstOrNull()
 }

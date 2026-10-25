@@ -185,6 +185,7 @@ private fun DyNavHost(
                     vm.handleIntent(pendingIntent.value)
                 }
                 androidx.compose.runtime.LaunchedEffect(Unit) {
+                    vm.refreshLocalState()
                     vm.checkClipboard()
                 }
                 HomeScreen(
@@ -226,8 +227,9 @@ private fun DyNavHost(
             }
             composable("favorites") {
                 val vm: com.douyin.feature.home.HomeViewModel = koinViewModel()
-                FavoritesScreen(favoritesRepository) { id ->
-                    vm.onInputChange(id)
+                FavoritesScreen(favoritesRepository) { item ->
+                    val target = item.sourceUrl.ifBlank { item.awemeId }
+                    vm.onInputChange(target)
                     vm.parse()
                     navController.navigate("home") {
                         popUpTo(navController.graph.startDestinationId) { saveState = true }

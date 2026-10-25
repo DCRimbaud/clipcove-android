@@ -53,7 +53,7 @@ import java.util.Locale
 @Composable
 fun FavoritesScreen(
     repository: FavoritesRepository,
-    onOpen: (String) -> Unit,
+    onOpen: (FavoriteItem) -> Unit,
 ) {
     var version by remember { mutableIntStateOf(0) }
     val items = remember(version) { repository.load() }
@@ -88,7 +88,7 @@ fun FavoritesScreen(
                             repository.remove(item.awemeId)
                             version++
                         },
-                        onClick = { onOpen(item.awemeId) },
+                        onClick = { onOpen(item) },
                     )
                 }
             }

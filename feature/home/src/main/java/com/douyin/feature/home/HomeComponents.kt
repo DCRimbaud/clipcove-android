@@ -30,15 +30,20 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.HighQuality
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.WarningAmber
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -71,6 +76,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
+import com.douyin.core.designsystem.DyAmber
 import com.douyin.core.designsystem.DyBorder
 import com.douyin.core.designsystem.DyCard
 import com.douyin.core.designsystem.DyCyan
@@ -86,6 +92,8 @@ import com.douyin.core.model.MediaImage
 import com.douyin.core.model.MediaInfo
 import com.douyin.core.model.MediaPlatform
 import com.douyin.core.model.MediaStats
+import com.douyin.core.model.VideoCandidate
+import com.douyin.core.model.VideoSourceKind
 import com.douyin.data.history.HistoryItem
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -102,9 +110,36 @@ internal fun ResultCard(
     val context = LocalContext.current
     var fullscreenImageIndex by remember { mutableIntStateOf(-1) }
     var fullscreenVideo by remember { mutableStateOf(false) }
+    var confirmWatermarkDownload by remember { mutableStateOf(false) }
     val favoriteScale = remember { Animatable(1f) }
     val platformColor = if (media.platform == MediaPlatform.XIAOHONGSHU) DyRed else DyCyan
     val title = media.title.ifBlank { "媒体 ${media.id}" }
+    val candidates = remember(media.id, media.videoCandidates, media.videoUrl) {
+        media.videoCandidates.ifEmpty {
+            if (media.videoUrl.isBlank()) {
+                emptyList()
+            } else {
+                listOf(
+                    VideoCandidate(
+                        label = "Platform stream",
+                        url = media.videoUrl,
+                        sourceKind = VideoSourceKind.OTHER,
+                    )
+                )
+            }
+        }
+    }
+    val initialCandidateIndex = remember(media.id, candidates) {
+        candidates.indexOfFirst { it.sourceKind == VideoSourceKind.ORIGINAL }.takeIf { it >= 0 } ?: 0
+    }
+    var selectedCandidateIndex by remember(media.id) { mutableIntStateOf(initialCandidateIndex) }
+    val selectedCandidate = candidates.getOrNull(selectedCandidateIndex)
+    val previewUrl = selectedCandidate?.url ?: media.videoUrl
+    val downloadVideo = {
+        if (previewUrl.isNotBlank()) {
+            onDownload(title, safeFilename(title, "mp4"), previewUrl)
+        }
+    }
 
     if (fullscreenImageIndex >= 0) {
         FullscreenImagePager(media.images, fullscreenImageIndex) {
@@ -112,7 +147,7 @@ internal fun ResultCard(
         }
     }
     if (fullscreenVideo) {
-        FullscreenVideoDialog(media.videoUrl) {
+        FullscreenVideoDialog(previewUrl) {
             fullscreenVideo = false
             (context as? android.app.Activity)?.requestedOrientation =
                 android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
@@ -135,6 +170,7 @@ internal fun ResultCard(
         Column {
             MediaPreview(
                 media = media,
+                previewUrl = previewUrl,
                 platformColor = platformColor,
                 onFullscreenVideo = {
                     fullscreenVideo = true
@@ -184,6 +220,14 @@ internal fun ResultCard(
                     Spacer(Modifier.height(12.dp))
                     StatsRow(media.stats)
                 }
+                if (candidates.isNotEmpty()) {
+                    Spacer(Modifier.height(14.dp))
+                    VideoCandidateSelector(
+                        candidates = candidates,
+                        selectedIndex = selectedCandidateIndex,
+                        onSelected = { selectedCandidateIndex = it },
+                    )
+                }
                 Spacer(Modifier.height(14.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     OutlinedButton(
@@ -220,17 +264,32 @@ internal fun ResultCard(
                         Text("分享", color = DyText)
                     }
                 }
-                if (media.videoUrl.isNotBlank()) {
+                if (previewUrl.isNotBlank()) {
                     Spacer(Modifier.height(10.dp))
                     Button(
-                        onClick = { onDownload(title, safeFilename(title, "mp4"), media.videoUrl) },
+                        onClick = {
+                            if (selectedCandidate?.watermarkRisk == true) {
+                                confirmWatermarkDownload = true
+                            } else {
+                                downloadVideo()
+                            }
+                        },
                         modifier = Modifier.fillMaxWidth().height(50.dp),
                         shape = RoundedCornerShape(15.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = DyRed),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (selectedCandidate?.watermarkRisk == true) DyAmber else DyRed,
+                        ),
                     ) {
                         Icon(Icons.Filled.Download, contentDescription = null, modifier = Modifier.size(19.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("下载无水印视频", fontWeight = FontWeight.SemiBold)
+                        Text(
+                            when {
+                                selectedCandidate?.sourceKind == VideoSourceKind.ORIGINAL -> "下载原片"
+                                selectedCandidate?.watermarkRisk == true -> "下载转码版本"
+                                else -> "下载视频"
+                            },
+                            fontWeight = FontWeight.SemiBold,
+                        )
                     }
                 }
                 if (media.musicUrl.isNotBlank()) {
@@ -265,24 +324,171 @@ internal fun ResultCard(
             }
         }
     }
+
+    if (confirmWatermarkDownload) {
+        AlertDialog(
+            onDismissRequest = { confirmWatermarkDownload = false },
+            containerColor = DyCard,
+            icon = { Icon(Icons.Filled.WarningAmber, contentDescription = null, tint = DyAmber) },
+            title = { Text("这个版本可能含水印", color = DyText) },
+            text = {
+                Text(
+                    "当前选择的是平台转码流，画面中可能包含平台或作者水印。建议先返回上一级重新解析，必要时再下载此版本。",
+                    color = DyTextSecondary,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirmWatermarkDownload = false
+                        downloadVideo()
+                    },
+                ) { Text("仍然下载", color = DyAmber) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmWatermarkDownload = false }) {
+                    Text("取消", color = DyTextSecondary)
+                }
+            },
+        )
+    }
 }
+
+@Composable
+private fun VideoCandidateSelector(
+    candidates: List<VideoCandidate>,
+    selectedIndex: Int,
+    onSelected: (Int) -> Unit,
+) {
+    val onlyWatermarked = candidates.isNotEmpty() && candidates.all { it.watermarkRisk }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                Icons.Filled.HighQuality,
+                contentDescription = null,
+                tint = DyCyan,
+                modifier = Modifier.size(18.dp),
+            )
+            Spacer(Modifier.width(7.dp))
+            Text("下载版本", style = MaterialTheme.typography.titleMedium, color = DyText)
+            Spacer(Modifier.weight(1f))
+            Text(
+                if (onlyWatermarked) "仅转码流" else "默认原片优先",
+                style = MaterialTheme.typography.bodySmall,
+                color = if (onlyWatermarked) DyAmber else DyGreen,
+            )
+        }
+        candidates.forEachIndexed { index, candidate ->
+            val selected = index == selectedIndex
+            Surface(
+                modifier = Modifier.fillMaxWidth().clickable { onSelected(index) },
+                shape = RoundedCornerShape(14.dp),
+                color = if (selected) DyRed.copy(alpha = 0.08f) else DyInput,
+                border = BorderStroke(
+                    1.dp,
+                    if (selected) DyRed.copy(alpha = 0.68f) else DyBorder.copy(alpha = 0.62f),
+                ),
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    RadioButton(
+                        selected = selected,
+                        onClick = { onSelected(index) },
+                        colors = RadioButtonDefaults.colors(
+                            selectedColor = DyRed,
+                            unselectedColor = DyTextSecondary,
+                        ),
+                    )
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            videoCandidateTitle(candidate, index),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = DyText,
+                        )
+                        val metadata = videoCandidateMetadata(candidate)
+                        if (metadata.isNotBlank()) {
+                            Text(
+                                metadata,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = DyTextSecondary,
+                            )
+                        }
+                    }
+                    DyPill(
+                        text = when {
+                            candidate.sourceKind == VideoSourceKind.ORIGINAL -> "无水印原片"
+                            candidate.watermarkRisk -> "可能含水印"
+                            else -> "转码"
+                        },
+                        color = when {
+                            candidate.sourceKind == VideoSourceKind.ORIGINAL -> DyGreen
+                            candidate.watermarkRisk -> DyAmber
+                            else -> DyCyan
+                        },
+                    )
+                }
+            }
+        }
+        if (onlyWatermarked) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(13.dp),
+                color = DyAmber.copy(alpha = 0.09f),
+                border = BorderStroke(1.dp, DyAmber.copy(alpha = 0.35f)),
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 11.dp, vertical = 9.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Icon(
+                        Icons.Filled.WarningAmber,
+                        contentDescription = null,
+                        tint = DyAmber,
+                        modifier = Modifier.size(17.dp),
+                    )
+                    Text(
+                        "当前只拿到平台转码流，画面可能包含水印。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = DyTextSecondary,
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun videoCandidateTitle(candidate: VideoCandidate, index: Int): String = when {
+    candidate.sourceKind == VideoSourceKind.ORIGINAL -> "原片 · 原画质"
+    candidate.sourceKind == VideoSourceKind.TRANSCODED -> "平台转码视频"
+    else -> "备用视频线路 ${index + 1}"
+}
+
+private fun videoCandidateMetadata(candidate: VideoCandidate): String = buildList {
+    if (candidate.resolutionLabel.isNotBlank()) add(candidate.resolutionLabel)
+    if (candidate.sizeBytes > 0) add(formatFileSize(candidate.sizeBytes))
+    if (candidate.bitrate > 0) add(formatBitrate(candidate.bitrate))
+}.joinToString(" · ")
 
 @Composable
 private fun MediaPreview(
     media: MediaInfo,
+    previewUrl: String,
     platformColor: Color,
     onFullscreenVideo: () -> Unit,
     onOpenImage: (Int) -> Unit,
 ) {
     when {
-        media.videoUrl.isNotBlank() -> {
+        previewUrl.isNotBlank() -> {
             Box(
                 Modifier
                     .fillMaxWidth()
                     .aspectRatio(16f / 9f)
                     .background(Color.Black),
             ) {
-                ExoPlayerPreview(media.videoUrl, Modifier.fillMaxSize(), autoPlay = false)
+                ExoPlayerPreview(previewUrl, Modifier.fillMaxSize(), autoPlay = false)
                 Box(
                     Modifier
                         .align(Alignment.TopStart)
@@ -686,6 +892,19 @@ private fun formatCount(value: Long): String = when {
 private fun formatDuration(durationMs: Long): String {
     val totalSeconds = durationMs / 1000
     return "%d:%02d".format(totalSeconds / 60, totalSeconds % 60)
+}
+
+private fun formatFileSize(bytes: Long): String = when {
+    bytes >= 1_073_741_824L -> "%.1f GB".format(bytes / 1_073_741_824.0)
+    bytes >= 1_048_576L -> "%.1f MB".format(bytes / 1_048_576.0)
+    bytes >= 1_024L -> "%.0f KB".format(bytes / 1_024.0)
+    else -> "$bytes B"
+}
+
+private fun formatBitrate(bitsPerSecond: Long): String = when {
+    bitsPerSecond >= 1_000_000L -> "%.1f Mbps".format(bitsPerSecond / 1_000_000.0)
+    bitsPerSecond >= 1_000L -> "%.0f Kbps".format(bitsPerSecond / 1_000.0)
+    else -> "$bitsPerSecond bps"
 }
 
 private fun safeFilename(title: String, ext: String): String {

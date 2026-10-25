@@ -16,10 +16,11 @@ class PrefsFavoritesRepository(context: Context) : FavoritesRepository {
             (0 until arr.length()).map { i ->
                 val o = arr.getJSONObject(i)
                 FavoriteItem(
-                    o.getString("awemeId"),
-                    o.getString("title"),
-                    o.getString("cover"),
-                    o.getLong("time")
+                    awemeId = o.getString("awemeId"),
+                    title = o.getString("title"),
+                    cover = o.getString("cover"),
+                    time = o.getLong("time"),
+                    sourceUrl = o.optString("sourceUrl"),
                 )
             }
         } catch (e: Exception) {
@@ -55,6 +56,7 @@ class PrefsFavoritesRepository(context: Context) : FavoritesRepository {
                     .put("title", it.title)
                     .put("cover", it.cover)
                     .put("time", it.time)
+                    .put("sourceUrl", it.sourceUrl)
             )
         }
         prefs.edit().putString(KEY, arr.toString()).apply()

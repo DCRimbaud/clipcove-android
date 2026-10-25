@@ -1,17 +1,27 @@
-﻿plugins {
+﻿import java.util.Properties
+
+plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.chaquopy)
 }
 
-// ===== 鐗堟湰绠＄悊 =====
-// 娴嬭瘯鐗?0.x.x(鏈寮忓彂甯?鎸夊姛鑳?淇杩唬閫掑 minor/patch)
-// 姝ｅ紡鐗?1.0.0 璧锋,涔嬪悗姘歌繙 1.x.x(2.0.0 浠呭湪閲嶅ぇ閲嶆瀯鏃朵娇鐢?
-val versionMajor = 1        // 0=test 1=release
-val versionMinor = 0        // feature
-val versionPatch = 2        // fix
+// Stable releases use 1.x.x; reserve 2.x.x for a major architecture change.
+val versionMajor = 1
+val versionMinor = 1
+val versionPatch = 0
 val appVersionName = "$versionMajor.$versionMinor.$versionPatch"
-val appVersionCode = 15
+val appVersionCode = 16
+
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+val keystoreProperties = Properties().apply {
+    if (keystorePropertiesFile.exists()) {
+        keystorePropertiesFile.inputStream().use { load(it) }
+    }
+}
+val releaseSigningKeys = listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
+val hasReleaseSigning = keystorePropertiesFile.exists() &&
+    releaseSigningKeys.all { !keystoreProperties.getProperty(it).isNullOrBlank() }
 
 android {
     namespace = "com.douyin.parser"
@@ -29,8 +39,20 @@ android {
         }
     }
 
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = rootProject.file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
+            signingConfig = signingConfigs.findByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
@@ -55,7 +77,7 @@ android {
 chaquopy {
     defaultConfig {
         version = "3.12"
-        // 鍙敤鐜鍙橀噺 PYTHON_EXE 瑕嗙洊(榛樿鏈満璺緞)
+        // PYTHON_EXE can override the local Python path.
         buildPython(System.getenv("PYTHON_EXE") ?: "python")
         pip {
             install("requests==2.32.3")
@@ -76,6 +98,7 @@ dependencies {
     implementation(project(":data:favorites"))
     implementation(project(":data:transfer"))
     implementation(project(":data:xhs"))
+    implementation(project(":data:update"))
     implementation(project(":feature:home"))
     implementation(project(":feature:downloads"))
     implementation(project(":feature:favorites"))

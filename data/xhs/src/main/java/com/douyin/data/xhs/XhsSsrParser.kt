@@ -8,6 +8,7 @@ import com.douyin.core.model.ParseFailure
 import com.douyin.core.model.ParseFailureType
 import com.douyin.core.model.ParseResult
 import com.douyin.core.model.VideoCandidate
+import com.douyin.core.model.VideoSourceKind
 import org.json.JSONArray
 import org.json.JSONObject
 import java.security.MessageDigest
@@ -149,7 +150,14 @@ object XhsSsrParser {
         }
         val originalVideoUrl = originVideoUrl(originVideoKey(video))
         val candidates = if (originalVideoUrl.isNotBlank()) {
-            listOf(VideoCandidate(label = "origin", url = originalVideoUrl)) + streamCandidates
+            listOf(
+                VideoCandidate(
+                    label = "Original",
+                    url = originalVideoUrl,
+                    sourceKind = VideoSourceKind.ORIGINAL,
+                    watermarkRisk = false,
+                )
+            ) + streamCandidates
         } else {
             streamCandidates
         }
@@ -205,12 +213,34 @@ object XhsSsrParser {
                     item.optLong("videoBitrate"),
                     item.optLong("video_bitrate"),
                 ).firstOrNull { it > 0 } ?: 0L
+                val width = sequenceOf(
+                    item.optInt("width"),
+                    item.optInt("videoWidth"),
+                    item.optInt("video_width"),
+                ).firstOrNull { it > 0 } ?: 0
+                val height = sequenceOf(
+                    item.optInt("height"),
+                    item.optInt("videoHeight"),
+                    item.optInt("video_height"),
+                ).firstOrNull { it > 0 } ?: 0
+                val sizeBytes = sequenceOf(
+                    item.optLong("size"),
+                    item.optLong("fileSize"),
+                    item.optLong("file_size"),
+                    item.optLong("videoSize"),
+                    item.optLong("video_size"),
+                ).firstOrNull { it > 0 } ?: 0L
                 add(
                     VideoCandidate(
                         label = item.optString("streamDesc")
                             .ifBlank { item.optString("stream_desc", "h264_$index") },
                         url = url,
                         bitrate = bitrate,
+                        width = width,
+                        height = height,
+                        sizeBytes = sizeBytes,
+                        sourceKind = VideoSourceKind.TRANSCODED,
+                        watermarkRisk = true,
                     )
                 )
             }

@@ -22,6 +22,7 @@ dependencies {
     implementation(project(":data:settings"))
     implementation(project(":data:favorites"))
     implementation(project(":data:transfer"))
+    implementation(project(":data:update"))
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
     implementation(libs.compose.material3)
@@ -33,4 +34,6 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.koin.androidx.compose)
     implementation(libs.koin.core)
+    testImplementation(libs.junit)
+    testImplementation(libs.orjson)
 }

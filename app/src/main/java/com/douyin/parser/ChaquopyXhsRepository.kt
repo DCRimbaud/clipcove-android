@@ -2,6 +2,7 @@ package com.douyin.parser
 
 import android.util.Log
 import com.chaquo.python.Python
+import com.douyin.core.common.diagnostics.DiagnosticSanitizer
 import com.douyin.core.model.ParseFailure
 import com.douyin.core.model.ParseFailureType
 import com.douyin.core.model.ParseResult
@@ -43,10 +44,18 @@ class ChaquopyXhsRepository : XhsRepository {
                 )
             }
             val finalUrl = envelope.optString("final_url").ifBlank { url }
-            Log.d(TAG, "XHS python page bytes=${html.length} finalUrl=${finalUrl.take(180)}")
+            Log.d(
+                TAG,
+                "XHS python page bytes=${html.length} finalUrl=" +
+                    DiagnosticSanitizer.sanitize(finalUrl, 180),
+            )
             XhsSsrParser.parse(html, finalUrl)
         } catch (e: Exception) {
-            Log.e(TAG, "XHS Python fetch failed", e)
+            Log.e(
+                TAG,
+                "XHS Python fetch failed: ${e::class.java.simpleName}: " +
+                    DiagnosticSanitizer.sanitize(e.message),
+            )
             ParseResult.Failure(
                 ParseFailure(
                     ParseFailureType.UNKNOWN,

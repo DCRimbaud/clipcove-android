@@ -12,9 +12,13 @@ ClipCove is a local-first Android media downloader for **Douyin** and **Xiaohong
 
 - Douyin and Xiaohongshu share text, short links, full links, and raw IDs
 - Video, original gallery image, audio, and Live Photo downloads
-- Xiaohongshu original-file priority via `originVideoKey` to avoid platform-watermarked streams
+- Xiaohongshu original-file priority via `originVideoKey`, with transparent transcoded fallback metadata
+- Download-quality selection with resolution, size, bitrate, and watermark-risk labels
 - Resumable downloads with pause, continue, retry, and foreground notifications
-- Local favorites, history, clipboard suggestions, and JSON backup
+- Local favorites and history that retain source URLs for reliable re-resolution
+- Versioned backup export and restore, including legacy backup compatibility
+- Sanitized local parser diagnostics and manual GitHub release checks
+- Clear-all data control and configurable release signing
 - Live Photo and audio merging with FFmpeg
 - Built-in WiFi transfer server for moving files to a computer
 - Dark Jetpack Compose UI with Android 7.0+ support (minSdk 24)
@@ -35,7 +39,7 @@ app/                   Application shell, navigation, DI, platform adapters
 core/
   model/               Typed media models and parse results
   designsystem/        Theme and shared Compose components
-  common/              Shared utilities
+  common/              Diagnostics contracts and sanitization
 data/
   douyin/              Douyin parser port and JSON mapper
   xhs/                 Xiaohongshu parser port and SSR mapper
@@ -45,6 +49,7 @@ data/
   merger/              FFmpeg merge port
   transfer/            WiFi transfer server
   settings/            Settings
+  update/              GitHub Releases update adapter
 feature/
   home/                Home, parse result, history
   downloads/           Download manager
@@ -52,7 +57,7 @@ feature/
   settings/            Settings
 ```
 
-Dependencies flow from `feature` to `core:model` and data-layer ports. Concrete platform implementations are assembled in `app`. Platform JSON is isolated in data mappers; UI code consumes typed `MediaInfo` and `ParseFailure` values.
+Dependencies flow from `feature` to `core:model` and data-layer ports. Concrete platform implementations are assembled in `app`. Platform JSON is isolated in data mappers; UI code consumes typed `MediaInfo`, `VideoCandidate`, and `ParseFailure` values. See [Architecture](docs/ARCHITECTURE.md) for the dependency rules and extension points.
 
 ## Build Requirements
 
@@ -114,6 +119,14 @@ Versions before `1.0.2` used a different package ID. Uninstall the old test buil
 - Anonymous parsing may hit rate limits or verification challenges.
 - Current GitHub release artifacts use debug signing. Configure your own release keystore before production distribution.
 - ClipCove does not provide account login, bulk scraping, proxy pools, or commercial collection features.
+
+## Documentation
+
+- [Architecture](docs/ARCHITECTURE.md)
+- [Quality gate](docs/QUALITY.md)
+- [Release and signing](docs/RELEASE.md)
+- [Privacy](docs/PRIVACY.md)
+- [Changelog](CHANGELOG.md)
 
 ## Security and Compliance
 

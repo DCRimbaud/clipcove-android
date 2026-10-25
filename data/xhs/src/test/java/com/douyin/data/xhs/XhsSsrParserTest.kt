@@ -3,9 +3,11 @@ package com.douyin.data.xhs
 import com.douyin.core.model.MediaPlatform
 import com.douyin.core.model.ParseFailureType
 import com.douyin.core.model.ParseResult
+import com.douyin.core.model.VideoSourceKind
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -124,6 +126,9 @@ class XhsSsrParserTest {
                                         .put("masterUrl", "https://example.com/watermarked.mp4")
                                         .put("avgBitrate", 2_000_000)
                                         .put("duration", 23_000)
+                                        .put("width", 720)
+                                        .put("height", 1280)
+                                        .put("size", 6_162_441)
                                 )
                             )
                         )
@@ -134,8 +139,14 @@ class XhsSsrParserTest {
 
         val media = (result as ParseResult.Success).media
         assertEquals("https://sns-video-bd.xhscdn.com/spectrum/original.mp4", media.videoUrl)
-        assertEquals("origin", media.videoCandidates.first().label)
         assertEquals("https://example.com/watermarked.mp4", media.videoCandidates.last().url)
+        assertEquals(VideoSourceKind.ORIGINAL, media.videoCandidates.first().sourceKind)
+        assertFalse(media.videoCandidates.first().watermarkRisk)
+        assertEquals(VideoSourceKind.TRANSCODED, media.videoCandidates.last().sourceKind)
+        assertTrue(media.videoCandidates.last().watermarkRisk)
+        assertEquals(720, media.videoCandidates.last().width)
+        assertEquals(1280, media.videoCandidates.last().height)
+        assertEquals(6_162_441L, media.videoCandidates.last().sizeBytes)
     }
 
     @Test

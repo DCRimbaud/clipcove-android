@@ -4,10 +4,13 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -26,14 +29,18 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -87,8 +94,24 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
     val message by viewModel.message.collectAsStateWithLifecycle()
     val wifiRunning by viewModel.wifiRunning.collectAsStateWithLifecycle()
     val wifiUrl by viewModel.wifiUrl.collectAsStateWithLifecycle()
+    val updateState by viewModel.updateState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var showChangelog by remember { mutableStateOf(false) }
+    var showClearAllConfirm by remember { mutableStateOf(false) }
+    val importBackup = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) {
+            val text = runCatching {
+                context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+            }.getOrNull()
+            if (text.isNullOrBlank()) {
+                viewModel.reportFileReadError()
+            } else {
+                viewModel.importData(text)
+            }
+        }
+    }
 
     LaunchedEffect(message) {
         message?.let {
@@ -171,8 +194,20 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 icon = Icons.Filled.Save,
                 tint = DyCyan,
                 title = "导出备份",
-                description = "导出历史与收藏为 JSON 文件",
+                description = "包含历史、收藏和原始链接的 JSON 文件",
                 onClick = { exportBackup(context, viewModel) },
+            )
+            HorizontalDivider(color = DyBorder.copy(alpha = 0.6f))
+            ActionRow(
+                icon = Icons.Filled.UploadFile,
+                tint = DyGreen,
+                title = "从备份还原",
+                description = "支持当前版本和旧版备份，重复条目会自动合并",
+                onClick = {
+                    importBackup.launch(
+                        arrayOf("application/json", "text/plain", "application/octet-stream")
+                    )
+                },
             )
             HorizontalDivider(color = DyBorder.copy(alpha = 0.6f))
             ActionRow(
@@ -189,6 +224,47 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 title = "清空下载列表",
                 description = "同时清理应用内的下载文件",
                 onClick = viewModel::clearDownloads,
+            )
+            HorizontalDivider(color = DyBorder.copy(alpha = 0.6f))
+            ActionRow(
+                icon = Icons.Filled.DeleteForever,
+                tint = DyRed,
+                title = "清空全部本地数据",
+                description = "删除历史、收藏、下载记录和诊断信息，需再次确认",
+                onClick = { showClearAllConfirm = true },
+            )
+        }
+
+        SettingsSection(title = "诊断与更新") {
+            ActionRow(
+                icon = Icons.Filled.BugReport,
+                tint = DyAmber,
+                title = "导出诊断报告",
+                description = "仅包含最多 50 条脱敏解析失败记录，不含分享链接",
+                onClick = { exportDiagnostics(context, viewModel) },
+            )
+            HorizontalDivider(color = DyBorder.copy(alpha = 0.6f))
+            ActionRow(
+                icon = Icons.Filled.Delete,
+                tint = DyTextSecondary,
+                title = "清空诊断记录",
+                description = "不会影响历史、收藏或已下载文件",
+                onClick = viewModel::clearDiagnostics,
+            )
+            HorizontalDivider(color = DyBorder.copy(alpha = 0.6f))
+            ActionRow(
+                icon = Icons.Filled.SystemUpdate,
+                tint = DyCyan,
+                title = updateActionTitle(updateState),
+                description = updateActionDescription(updateState),
+                onClick = {
+                    val release = (updateState as? UpdateUiState.Available)?.release
+                    if (release != null) {
+                        openReleasePage(context, release.htmlUrl)
+                    } else {
+                        viewModel.checkForUpdate()
+                    }
+                },
             )
         }
 
@@ -207,11 +283,11 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                         color = DyTextSecondary,
                     )
                 }
-                DyPill("无水印", DyGreen)
+                DyPill("本地处理", DyGreen)
             }
             HorizontalDivider(color = DyBorder.copy(alpha = 0.6f))
             Text(
-                "支持抖音与小红书的分享链接解析、视频 / 图集 / 原声下载、本地收藏和局域网传输。仅用于个人学习，请尊重版权与平台规则。",
+                "支持抖音与小红书的链接解析、原片优先、画质来源提示、图集 / 原声下载、本地收藏和局域网传输。仅用于个人学习，请尊重版权与平台规则。",
                 style = MaterialTheme.typography.bodySmall,
                 color = DyTextSecondary,
                 modifier = Modifier.padding(14.dp),
@@ -222,7 +298,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 icon = Icons.Filled.Description,
                 tint = DyCyan,
                 title = "查看更新日志",
-                description = "了解每个版本的变化",
+                description = "只看当前版本的简要变化",
                 onClick = { showChangelog = true },
             )
         }
@@ -236,6 +312,34 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             Spacer(Modifier.width(5.dp))
             Text("所有解析都在本机完成", style = MaterialTheme.typography.bodySmall, color = DyTextSecondary)
         }
+    }
+
+    if (showClearAllConfirm) {
+        AlertDialog(
+            onDismissRequest = { showClearAllConfirm = false },
+            containerColor = DyCard,
+            icon = { Icon(Icons.Filled.DeleteForever, contentDescription = null, tint = DyRed) },
+            title = { Text("清空全部本地数据？", color = DyText) },
+            text = {
+                Text(
+                    "这会删除解析历史、收藏、应用内下载任务与文件、以及诊断记录。已经保存到系统「下载」目录的文件不会被删除。此操作无法撤销。",
+                    color = DyTextSecondary,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showClearAllConfirm = false
+                        viewModel.clearAllLocalData()
+                    },
+                ) { Text("确认清空", color = DyRed) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearAllConfirm = false }) {
+                    Text("取消", color = DyTextSecondary)
+                }
+            },
+        )
     }
 
     if (showChangelog) {
@@ -318,48 +422,112 @@ private fun ActionRow(
     }
 }
 
-/** 导出备份：Android 10+ 使用 MediaStore，旧系统使用公共下载目录 + FileProvider。 */
-@Suppress("DEPRECATION")
+private fun updateActionTitle(state: UpdateUiState): String = when (state) {
+    UpdateUiState.Idle -> "检查更新"
+    UpdateUiState.Checking -> "正在检查更新"
+    UpdateUiState.UpToDate -> "已是最新版本"
+    is UpdateUiState.Available -> "发现新版本 ${state.release.tagName}"
+    is UpdateUiState.Failed -> "重新检查更新"
+}
+
+private fun updateActionDescription(state: UpdateUiState): String = when (state) {
+    UpdateUiState.Idle -> "手动查询 GitHub Releases，不会在后台自动访问"
+    UpdateUiState.Checking -> "正在连接 GitHub，请稍候…"
+    UpdateUiState.UpToDate -> "当前版本已是 GitHub 上可用的最新版本"
+    is UpdateUiState.Available -> "点按前往 GitHub 下载页查看发布说明和安装包"
+    is UpdateUiState.Failed -> "检查失败：${state.message.take(100)}，点按重试"
+}
+
+private fun openReleasePage(context: Context, url: String) {
+    val allowedPrefix = "https://github.com/DCRimbaud/clipcove-android/releases/"
+    val safeUrl = url.takeIf { it.startsWith(allowedPrefix) }
+        ?: "https://github.com/DCRimbaud/clipcove-android/releases"
+    runCatching {
+        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(safeUrl)))
+    }.onFailure {
+        Toast.makeText(context, "无法打开浏览器", Toast.LENGTH_SHORT).show()
+    }
+}
+
+/** Export backup: MediaStore on Android 10+, FileProvider on older releases. */
 private fun exportBackup(context: Context, viewModel: SettingsViewModel) {
     try {
-        val json = viewModel.exportData()
         val filename = "clipcove_backup_${System.currentTimeMillis()}.json"
-        val uri = if (Build.VERSION.SDK_INT >= 29) {
-            val values = android.content.ContentValues().apply {
-                put(MediaStore.Downloads.DISPLAY_NAME, filename)
-                put(MediaStore.Downloads.MIME_TYPE, "application/json")
-                put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
-            }
-            val contentUri = context.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
-                ?: throw RuntimeException("无法创建备份文件")
-            context.contentResolver.openOutputStream(contentUri)?.use { it.write(json.toByteArray()) }
-                ?: throw RuntimeException("写入失败")
-            contentUri
-        } else {
-            if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) !=
-                PackageManager.PERMISSION_GRANTED
-            ) {
-                (context as? android.app.Activity)?.requestPermissions(
-                    arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE),
-                    REQUEST_WRITE_STORAGE,
-                )
-                Toast.makeText(context, "请允许存储权限后再次导出", Toast.LENGTH_LONG).show()
-                return
-            }
-            val file = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), filename)
-            file.writeText(json)
-            FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-        }
+        exportTextFile(
+            context = context,
+            content = viewModel.exportData(),
+            filename = filename,
+            mimeType = "application/json",
+            chooserTitle = "分享备份",
+        )
         Toast.makeText(context, "备份已导出：$filename", Toast.LENGTH_LONG).show()
-        val share = Intent(Intent.ACTION_SEND).apply {
-            type = "application/json"
-            putExtra(Intent.EXTRA_STREAM, uri)
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        }
-        context.startActivity(Intent.createChooser(share, "分享备份"))
     } catch (e: Exception) {
         Toast.makeText(context, "导出失败：${e.message}", Toast.LENGTH_LONG).show()
     }
+}
+
+private fun exportDiagnostics(context: Context, viewModel: SettingsViewModel) {
+    try {
+        val filename = "clipcove_diagnostics_${System.currentTimeMillis()}.txt"
+        exportTextFile(
+            context = context,
+            content = viewModel.exportDiagnostics(),
+            filename = filename,
+            mimeType = "text/plain",
+            chooserTitle = "分享诊断报告",
+        )
+        Toast.makeText(context, "诊断报告已导出：$filename", Toast.LENGTH_LONG).show()
+    } catch (e: Exception) {
+        Toast.makeText(context, "导出失败：${e.message}", Toast.LENGTH_LONG).show()
+    }
+}
+
+@Suppress("DEPRECATION")
+private fun exportTextFile(
+    context: Context,
+    content: String,
+    filename: String,
+    mimeType: String,
+    chooserTitle: String,
+) {
+    val uri = if (Build.VERSION.SDK_INT >= 29) {
+        val values = android.content.ContentValues().apply {
+            put(MediaStore.Downloads.DISPLAY_NAME, filename)
+            put(MediaStore.Downloads.MIME_TYPE, mimeType)
+            put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+        }
+        val contentUri = context.contentResolver.insert(
+            MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+            values,
+        ) ?: throw RuntimeException("无法创建导出文件")
+        context.contentResolver.openOutputStream(contentUri)?.use {
+            it.write(content.toByteArray(Charsets.UTF_8))
+        } ?: throw RuntimeException("写入导出文件失败")
+        contentUri
+    } else {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            (context as? android.app.Activity)?.requestPermissions(
+                arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE),
+                REQUEST_WRITE_STORAGE,
+            )
+            throw RuntimeException("请允许存储权限后再次导出")
+        }
+        val file = File(
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+            filename,
+        )
+        file.writeText(content, Charsets.UTF_8)
+        FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+    }
+
+    val share = Intent(Intent.ACTION_SEND).apply {
+        type = mimeType
+        putExtra(Intent.EXTRA_STREAM, uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    context.startActivity(Intent.createChooser(share, chooserTitle))
 }
 
 private const val REQUEST_WRITE_STORAGE = 202

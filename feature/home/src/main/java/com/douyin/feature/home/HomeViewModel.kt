@@ -8,6 +8,8 @@ import android.util.Log
 import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.douyin.core.common.diagnostics.DiagnosticSanitizer
+import com.douyin.core.common.diagnostics.DiagnosticsRepository
 import com.douyin.core.model.MediaInfo
 import com.douyin.core.model.ParseFailure
 import com.douyin.core.model.ParseFailureType
@@ -33,6 +35,7 @@ class HomeViewModel(
     private val downloadRepo: DownloadRepository,
     private val merger: VideoMerger,
     private val favoritesRepo: FavoritesRepository,
+    private val diagnosticsRepo: DiagnosticsRepository,
     app: Application,
 ) : AndroidViewModel(app) {
 
@@ -57,6 +60,8 @@ class HomeViewModel(
     private val _isFavorite = MutableStateFlow(false)
     val isFavorite: StateFlow<Boolean> = _isFavorite
 
+    private var lastSuccessSourceUrl: String = ""
+
     init {
         _history.value = historyRepo.load()
     }
@@ -64,6 +69,14 @@ class HomeViewModel(
     fun onInputChange(value: String) {
         _input.value = value
         if (_error.value != null) _error.value = null
+    }
+
+    /** Re-sync local repositories after Settings clears or restores app data. */
+    fun refreshLocalState() {
+        _history.value = historyRepo.load()
+        _result.value?.let { media ->
+            _isFavorite.value = favoritesRepo.isFavorite(media.id)
+        }
     }
 
     fun acceptIncoming(text: String?) {
@@ -120,6 +133,7 @@ class HomeViewModel(
                     title = media.title,
                     cover = media.coverUrl,
                     time = System.currentTimeMillis(),
+                    sourceUrl = lastSuccessSourceUrl,
                 )
             )
             _isFavorite.value = true
@@ -160,18 +174,47 @@ class HomeViewModel(
                 when (outcome) {
                     is ParseResult.Success -> applySuccess(outcome.media, originalInput)
                     is ParseResult.Failure -> {
-                        outcome.error.debugDetail?.let {
-                            Log.w(TAG, "Parse failed: ${outcome.error.type} $it")
+                        val failure = outcome.error
+                        failure.debugDetail?.let {
+                            Log.w(
+                                TAG,
+                                "Parse failed: ${failure.type} ${DiagnosticSanitizer.sanitize(it)}",
+                            )
                         }
+                        diagnosticsRepo.record(
+                            category = platform.name.lowercase().replaceFirstChar { it.uppercase() },
+                            message = failure.message,
+                            detail = buildString {
+                                append("type=")
+                                append(failure.type)
+                                append(" retryable=")
+                                append(failure.isRetryable)
+                                if (!failure.debugDetail.isNullOrBlank()) {
+                                    append('\n')
+                                    append(failure.debugDetail)
+                                }
+                            },
+                        )
                         _result.value = null
                         _isFavorite.value = false
-                        _error.value = outcome.error
+                        lastSuccessSourceUrl = ""
+                        _error.value = failure
                     }
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Unexpected parse failure", e)
+                Log.e(
+                    TAG,
+                    "Unexpected parse failure: ${e::class.java.simpleName}: " +
+                        DiagnosticSanitizer.sanitize(e.message),
+                )
+                diagnosticsRepo.record(
+                    category = platform.name.lowercase().replaceFirstChar { it.uppercase() },
+                    message = "Unexpected parser exception",
+                    detail = "${e::class.java.simpleName}: ${e.message}",
+                )
                 _result.value = null
                 _isFavorite.value = false
+                lastSuccessSourceUrl = ""
                 _error.value = ParseFailure(
                     ParseFailureType.UNKNOWN,
                     "解析失败，请稍后重试",
@@ -203,6 +246,7 @@ class HomeViewModel(
 
     private fun applySuccess(media: MediaInfo, originalInput: String) {
         _result.value = media
+        lastSuccessSourceUrl = originalInput
         _isFavorite.value = favoritesRepo.isFavorite(media.id)
         historyRepo.add(
             HistoryItem(

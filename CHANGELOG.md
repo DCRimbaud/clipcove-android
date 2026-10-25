@@ -2,6 +2,30 @@
 
 All notable changes to ClipCove are documented here.
 
+## [1.1.0] - 2026-10-26
+
+### Added
+
+- Source-aware video candidates with resolution, size, bitrate, source kind, and watermark-risk metadata.
+- In-app quality selection that defaults to the original Xiaohongshu stream and warns before downloading a transcoded fallback.
+- Versioned backup restore with support for legacy flat-array backups.
+- Clear-all local data confirmation.
+- Bounded, sanitized parser diagnostics with export support.
+- Manual GitHub Releases update check, including prerelease support.
+- Configurable release signing through an ignored `keystore.properties` file.
+- Architecture, quality, release, and privacy documentation.
+
+### Changed
+
+- Favorites now retain the original share URL so Xiaohongshu entries can be re-resolved reliably.
+- History and favorites remain backward compatible with previously stored data.
+- The built-in changelog is now a concise user-facing summary.
+- Version bumped to `1.1.0` (`versionCode` 16).
+
+### Security
+
+- Diagnostics redact tokens, cookies, phone numbers, email addresses, and IPv4 addresses before storage and export.
+
 ## [1.0.2] - 2026-10-26
 
 ### Fixed

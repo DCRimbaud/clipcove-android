@@ -8,6 +8,7 @@ import com.douyin.core.model.ParseFailure
 import com.douyin.core.model.ParseFailureType
 import com.douyin.core.model.ParseResult
 import com.douyin.core.model.VideoCandidate
+import com.douyin.core.model.VideoSourceKind
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -36,9 +37,20 @@ object DouyinMediaMapper {
             )
         }
 
-        val candidates = root.optJSONArray("play_urls").toVideoCandidates()
-        val videoUrl = root.optString("play_url")
+        val declaredVideoUrl = root.optString("play_url")
+        val candidates = root.optJSONArray("play_urls").toVideoCandidates().toMutableList()
+        val videoUrl = declaredVideoUrl
             .ifBlank { candidates.firstOrNull()?.url.orEmpty() }
+        if (videoUrl.isNotBlank() && candidates.none { it.url == videoUrl }) {
+            candidates.add(
+                0,
+                VideoCandidate(
+                    label = "Platform stream",
+                    url = videoUrl,
+                    sourceKind = VideoSourceKind.TRANSCODED,
+                )
+            )
+        }
         val images = root.optJSONArray("images").toMediaImages()
         if (videoUrl.isBlank() && images.isEmpty()) {
             return ParseResult.Failure(
@@ -120,6 +132,13 @@ object DouyinMediaMapper {
                         label = item.optString("label", "candidate_$index"),
                         url = url,
                         bitrate = item.optLong("bitrate").coerceAtLeast(0),
+                        width = item.optInt("width").coerceAtLeast(0),
+                        height = item.optInt("height").coerceAtLeast(0),
+                        sizeBytes = sequenceOf(
+                            item.optLong("size"),
+                            item.optLong("file_size"),
+                        ).firstOrNull { it > 0 } ?: 0L,
+                        sourceKind = VideoSourceKind.TRANSCODED,
                     )
                 )
             }
