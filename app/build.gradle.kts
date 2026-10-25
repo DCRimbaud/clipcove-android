@@ -9,16 +9,16 @@
 // 姝ｅ紡鐗?1.0.0 璧锋,涔嬪悗姘歌繙 1.x.x(2.0.0 浠呭湪閲嶅ぇ閲嶆瀯鏃朵娇鐢?
 val versionMajor = 1        // 0=test 1=release
 val versionMinor = 0        // feature
-val versionPatch = 1        // fix
+val versionPatch = 2        // fix
 val appVersionName = "$versionMajor.$versionMinor.$versionPatch"
-val appVersionCode = 13
+val appVersionCode = 15
 
 android {
     namespace = "com.douyin.parser"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.douyin.parser"
+        applicationId = "io.github.dcrimbaud.clipcove"
         minSdk = 24
         targetSdk = 34
         versionCode = appVersionCode

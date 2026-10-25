@@ -80,7 +80,7 @@ class DownloadService : Service() {
         )
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.stat_sys_download)
-            .setContentTitle("拾刻下载")
+            .setContentTitle("ClipCove Downloads")
             .setContentText(text)
             .setContentIntent(pi)
             .setOngoing(true)

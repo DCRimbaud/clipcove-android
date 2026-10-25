@@ -139,7 +139,7 @@ class WifiTransferServer(private val context: Context) {
         }
         val html = """
             <!DOCTYPE html>
-            <html><head><meta charset="utf-8"><title>拾刻 - WiFi 传输</title>
+            <html><head><meta charset="utf-8"><title>ClipCove - WiFi Transfer</title>
             <style>
             body{font-family:sans-serif;background:#141518;color:#fff;margin:0;padding:20px}
             h1{font-size:20px}a{color:#25F4EE;text-decoration:none}
@@ -148,7 +148,7 @@ class WifiTransferServer(private val context: Context) {
             th{color:#8a8a93;font-size:12px}
             .empty{color:#8a8a93;margin-top:20px}
             </style></head><body>
-            <h1>拾刻 · WiFi 传输</h1>
+            <h1>ClipCove · WiFi Transfer</h1>
             <p style="color:#8a8a93">手机已下载的文件,点击即可下载到本机</p>
             ${if (files.isEmpty()) "<p class='empty'>暂无已下载文件</p>" else "<table><tr><th>文件名</th><th>大小</th><th>字节</th></tr>$rows</table>"}
             </body></html>

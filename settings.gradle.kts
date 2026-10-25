@@ -17,7 +17,7 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "DouyinParser"
+rootProject.name = "ClipCove"
 include(":app")
 include(":core:model")
 include(":core:designsystem")

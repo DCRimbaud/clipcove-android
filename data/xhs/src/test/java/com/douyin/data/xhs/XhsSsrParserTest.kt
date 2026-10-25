@@ -103,6 +103,42 @@ class XhsSsrParserTest {
     }
 
     @Test
+    fun `prefers origin video over watermarked stream`() {
+        val note = JSONObject()
+            .put("noteId", NOTE_ID)
+            .put("title", "原片测试")
+            .put("type", "video")
+            .put("user", JSONObject().put("nickname", "作者"))
+            .put(
+                "video",
+                JSONObject()
+                    .put("consumer", JSONObject().put("originVideoKey", "spectrum/original.mp4"))
+                    .put(
+                        "media",
+                        JSONObject().put(
+                            "stream",
+                            JSONObject().put(
+                                "h264",
+                                JSONArray().put(
+                                    JSONObject()
+                                        .put("masterUrl", "https://example.com/watermarked.mp4")
+                                        .put("avgBitrate", 2_000_000)
+                                        .put("duration", 23_000)
+                                )
+                            )
+                        )
+                    )
+            )
+
+        val result = XhsSsrParser.parse(html(stateFor(note)), sourceUrl())
+
+        val media = (result as ParseResult.Success).media
+        assertEquals("https://sns-video-bd.xhscdn.com/spectrum/original.mp4", media.videoUrl)
+        assertEquals("origin", media.videoCandidates.first().label)
+        assertEquals("https://example.com/watermarked.mp4", media.videoCandidates.last().url)
+    }
+
+    @Test
     fun `maps mobile noteData SSR payload`() {
         val mobileNote = JSONObject()
             .put("noteId", NOTE_ID)

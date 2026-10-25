@@ -1,7 +1,7 @@
-# 行为准则
+# Code of Conduct
 
-参与者应保持尊重、专业和建设性。
+Participants are expected to be respectful, professional, and constructive.
 
-不可接受的行为包括骚扰、歧视、人身攻击、公开他人隐私信息，以及发布或请求绕过授权的版权内容、账号凭据或敏感数据。
+Unacceptable behavior includes harassment, discrimination, personal attacks, publishing private information, and requesting unauthorized copyrighted material, account credentials, or sensitive data.
 
-维护者可以删除不当内容，并限制持续违反本准则的参与者。安全问题请按 [SECURITY.md](SECURITY.md) 私下报告。
+Maintainers may remove inappropriate content and restrict participants who repeatedly violate this policy. Report security issues privately as described in [SECURITY.md](SECURITY.md).

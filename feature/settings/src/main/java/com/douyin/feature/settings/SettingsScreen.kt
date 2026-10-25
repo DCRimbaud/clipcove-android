@@ -192,7 +192,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             )
         }
 
-        SettingsSection(title = "关于拾刻") {
+        SettingsSection(title = "关于 ClipCove") {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(14.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -200,7 +200,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             ) {
                 DyIconTile(Icons.Filled.Settings, tint = DyRed, size = 48.dp)
                 Column(Modifier.weight(1f)) {
-                    Text("拾刻", style = MaterialTheme.typography.titleLarge, color = DyText)
+                    Text("ClipCove", style = MaterialTheme.typography.titleLarge, color = DyText)
                     Text(
                         "v${viewModel.versionName} · build ${viewModel.versionCode}",
                         style = MaterialTheme.typography.bodySmall,
@@ -323,7 +323,7 @@ private fun ActionRow(
 private fun exportBackup(context: Context, viewModel: SettingsViewModel) {
     try {
         val json = viewModel.exportData()
-        val filename = "shike_backup_${System.currentTimeMillis()}.json"
+        val filename = "clipcove_backup_${System.currentTimeMillis()}.json"
         val uri = if (Build.VERSION.SDK_INT >= 29) {
             val values = android.content.ContentValues().apply {
                 put(MediaStore.Downloads.DISPLAY_NAME, filename)

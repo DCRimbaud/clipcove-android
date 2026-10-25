@@ -1,28 +1,28 @@
-name: 功能建议
-description: 提议新功能或体验改进
+name: Feature request
+description: Suggest a new capability or UX improvement
 title: "[Feature] "
 labels: ["enhancement"]
 body:
   - type: textarea
     id: problem
     attributes:
-      label: 要解决的问题
+      label: Problem to solve
     validations:
       required: true
   - type: textarea
     id: proposal
     attributes:
-      label: 建议方案
+      label: Proposed solution
     validations:
       required: true
   - type: textarea
     id: alternatives
     attributes:
-      label: 可选方案与取舍
+      label: Alternatives and tradeoffs
   - type: checkboxes
     id: scope
     attributes:
-      label: 合规确认
+      label: Compliance confirmation
       options:
-        - label: 该建议不包含批量爬取、账号窃取、绕过付费或 DRM 等能力
+        - label: This request does not involve bulk scraping, account theft, paywall bypass, or DRM circumvention
           required: true

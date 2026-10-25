@@ -1,15 +1,15 @@
-## 变更内容
+## Summary
 
-<!-- 简要说明问题和修复方式 -->
+<!-- What problem does this change solve, and how? -->
 
-## 验证
+## Verification
 
 - [ ] `lintDebug`
 - [ ] `testDebugUnitTest`
 - [ ] `assembleDebug`
-- [ ] 必要时运行 `tools/smoke_network.py`
-- [ ] UI 截图或日志已脱敏
+- [ ] `tools/smoke_network.py` when live platform behavior is involved
+- [ ] Logs and screenshots are sanitized
 
-## 风险
+## Risks
 
-<!-- 平台风控、兼容性、许可证或发布风险 -->
+<!-- Platform compatibility, security, licensing, or release risks -->

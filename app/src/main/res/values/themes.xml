@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.DouyinParser" parent="android:Theme.Material.NoActionBar">
+    <style name="Theme.ClipCove" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowBackground">@color/dy_bg</item>
         <item name="android:statusBarColor">@color/dy_bg</item>
         <item name="android:navigationBarColor">@color/dy_bg</item>

@@ -58,5 +58,5 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v7
         with:
-          name: shike-debug-apk
+          name: clipcove-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk

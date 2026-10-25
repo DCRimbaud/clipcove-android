@@ -1,29 +1,29 @@
-# 安全策略
+# Security Policy
 
-## 支持范围
+## Supported Versions
 
-当前维护 `1.0.x`。如果漏洞同时影响旧版，请同时说明受影响版本。
+The current maintained line is `1.0.x`. If a vulnerability also affects older versions, include the affected versions in your report.
 
-## 报告漏洞
+## Reporting a Vulnerability
 
-请使用 GitHub 仓库的 **Security → Report a vulnerability** 私密报告功能，不要直接创建公开 Issue。
+Use the repository's private **Security → Report a vulnerability** flow. Do not open a public issue for an exploitable vulnerability.
 
-报告中请包含：
+Include:
 
-- 受影响版本和 Android 版本
-- 复现步骤
-- 影响范围
-- 必要的脱敏日志或 PoC
+- Affected versions and Android versions
+- Reproduction steps
+- Security impact
+- Sanitized logs or a minimal proof of concept
 
-不要在报告中附带真实 Cookie、`xsec_token`、签名密钥、手机号、IP 地址或版权媒体文件。
+Never include real cookies, `xsec_token` values, signing keys, phone numbers, IP addresses, or copyrighted media files.
 
-## 重点范围
+## In Scope
 
-- 明文 HTTP 传输或 Token 泄露
-- WiFi 文件服务的鉴权与路径穿越
-- 下载文件覆盖、路径注入或任意文件访问
-- WebView / 外部 Intent / 文件分享导致的任意代码或数据访问
-- 日志与备份中的敏感信息泄露
-- 依赖项已知高危漏洞
+- Token or credential leakage
+- WiFi transfer authentication and path traversal issues
+- Arbitrary file read, overwrite, or path injection
+- Unsafe external intents or file sharing
+- Sensitive information in logs or backups
+- Known high-severity dependency vulnerabilities
 
-平台风控、限流、链接过期和接口结构变化属于兼容性问题，请使用普通 Bug Issue。
+Platform rate limiting, expired links, and API structure changes are compatibility bugs and should be reported through a normal issue.

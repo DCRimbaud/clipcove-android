@@ -142,10 +142,16 @@ object XhsSsrParser {
         val directStreams = video?.optJSONObject("media")?.optJSONObject("stream")
             ?: video?.optJSONObject("stream")
         var h264Streams = directStreams?.optJSONArray("h264")
-        var candidates = h264Streams.toVideoCandidates()
-        if (candidates.isEmpty()) {
+        var streamCandidates = h264Streams.toVideoCandidates()
+        if (streamCandidates.isEmpty()) {
             h264Streams = mediaV2Streams(video)?.optJSONArray("h264")
-            candidates = h264Streams.toVideoCandidates()
+            streamCandidates = h264Streams.toVideoCandidates()
+        }
+        val originalVideoUrl = originVideoUrl(originVideoKey(video))
+        val candidates = if (originalVideoUrl.isNotBlank()) {
+            listOf(VideoCandidate(label = "origin", url = originalVideoUrl)) + streamCandidates
+        } else {
+            streamCandidates
         }
         val videoUrl = candidates.firstOrNull()?.url.orEmpty()
         val firstImageUrl = images?.optJSONObject(0).bestImageUrl().orEmpty()
@@ -211,13 +217,35 @@ object XhsSsrParser {
         }
     }
 
-    private fun mediaV2Streams(video: JSONObject?): JSONObject? {
+    private fun mediaV2Object(video: JSONObject?): JSONObject? {
         if (video == null) return null
         return when (val value = video.opt("mediaV2")) {
-            is JSONObject -> value.optJSONObject("stream")
-            is String -> runCatching { JSONObject(value).optJSONObject("stream") }.getOrNull()
+            is JSONObject -> value
+            is String -> runCatching { JSONObject(value) }.getOrNull()
             else -> null
         }
+    }
+
+    private fun mediaV2Streams(video: JSONObject?): JSONObject? =
+        mediaV2Object(video)?.optJSONObject("stream")
+
+    private fun originVideoKey(video: JSONObject?): String {
+        if (video == null) return ""
+        val consumer = video.optJSONObject("consumer")
+        val direct = consumer?.optString("originVideoKey").orEmpty()
+            .ifBlank { consumer?.optString("origin_video_key").orEmpty() }
+            .ifBlank { video.optString("originVideoKey") }
+        if (direct.isNotBlank()) return direct.trim()
+        val mediaConsumer = mediaV2Object(video)?.optJSONObject("consumer")
+        return mediaConsumer?.optString("originVideoKey").orEmpty()
+            .ifBlank { mediaConsumer?.optString("origin_video_key").orEmpty() }
+            .trim()
+    }
+
+    private fun originVideoUrl(key: String): String {
+        if (key.isBlank()) return ""
+        if (key.startsWith("http://") || key.startsWith("https://")) return key
+        return "https://sns-video-bd.xhscdn.com/${key.trimStart('/')}"
     }
 
     private fun pickNoteKey(

@@ -217,12 +217,12 @@ private fun HomeHeader() {
                 .background(Brush.linearGradient(listOf(DyRed, Color(0xFFFF7A5C)))),
             contentAlignment = Alignment.Center,
         ) {
-            Text("拾", color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.Bold)
+            Text("C", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
         }
         DyPageHeader(
-            title = "拾刻",
-            subtitle = "把喜欢的内容，干净地留在本地。",
-            eyebrow = "SHIKE · MEDIA KIT",
+            title = "ClipCove",
+            subtitle = "Keep what you love. Locally.",
+            eyebrow = "LOCAL MEDIA · PRIVATE BY DEFAULT",
             modifier = Modifier.weight(1f),
             trailing = { DyPill(text = "本地解析", color = DyCyan) },
         )

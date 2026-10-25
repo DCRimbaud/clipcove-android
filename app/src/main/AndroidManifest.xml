@@ -13,9 +13,9 @@
 
     <application
         android:name=".DouyinApp"
-        android:label="拾刻"
+        android:label="ClipCove"
         android:icon="@mipmap/ic_launcher"
-        android:theme="@style/Theme.DouyinParser"
+        android:theme="@style/Theme.ClipCove"
         android:usesCleartextTraffic="true">
         <activity
             android:name=".MainActivity"

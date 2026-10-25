@@ -1,58 +1,58 @@
-name: Bug 报告
-description: 报告解析、下载或界面问题
+name: Bug report
+description: Report a parsing, download, UI, or build issue
 title: "[Bug] "
 labels: ["bug"]
 body:
   - type: markdown
     attributes:
       value: |
-        请先移除 Cookie、xsec_token、手机号、IP 和版权内容。安全漏洞请改用 Security Advisory。
+        Remove cookies, xsec_token values, phone numbers, IP addresses, and copyrighted media before submitting. Report security issues through a private advisory.
   - type: input
     id: version
     attributes:
-      label: App 版本
-      placeholder: "1.0.1 (13)"
+      label: ClipCove version
+      placeholder: "1.0.2 (15)"
     validations:
       required: true
   - type: input
     id: device
     attributes:
-      label: Android 版本与设备
+      label: Android version and device
       placeholder: "Android 14 / Pixel 6"
     validations:
       required: true
   - type: dropdown
     id: platform
     attributes:
-      label: 平台
+      label: Platform
       options:
-        - 抖音
-        - 小红书
-        - 通用 / 下载管理
-        - 构建 / CI
+        - Douyin
+        - Xiaohongshu
+        - Downloads / general UI
+        - Build / CI
     validations:
       required: true
   - type: textarea
     id: steps
     attributes:
-      label: 复现步骤
-      placeholder: "1. 复制分享链接
-2. 打开 App
+      label: Steps to reproduce
+      placeholder: "1. Copy a share link
+2. Open ClipCove
 3. ..."
     validations:
       required: true
   - type: textarea
     id: result
     attributes:
-      label: 实际结果与错误信息
+      label: Actual result and error
     validations:
       required: true
   - type: textarea
     id: expected
     attributes:
-      label: 预期结果
+      label: Expected result
   - type: textarea
     id: logs
     attributes:
-      label: 已脱敏日志或截图
-      description: 不要粘贴完整 Cookie、xsec_token 或媒体文件。
+      label: Sanitized logs or screenshots
+      description: Do not include full cookies, xsec_token values, or media files.

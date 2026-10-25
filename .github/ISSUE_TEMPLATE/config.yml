@@ -1,5 +1,5 @@
 blank_issues_enabled: false
 contact_links:
-  - name: 私密报告安全问题
-    url: https://github.com/DCRimbaud/shike-android/security/advisories/new
-    about: 不要在公开 Issue 中披露 Cookie、Token 或可利用漏洞。
+  - name: Report a security vulnerability privately
+    url: https://github.com/DCRimbaud/clipcove-android/security/advisories/new
+    about: Do not disclose cookies, tokens, or exploitable vulnerabilities in a public issue.
