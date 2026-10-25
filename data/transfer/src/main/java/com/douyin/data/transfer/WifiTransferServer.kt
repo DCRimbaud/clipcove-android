@@ -8,6 +8,7 @@ import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
 import java.net.URLDecoder
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
 /**
@@ -16,7 +17,7 @@ import java.util.concurrent.Executors
 class WifiTransferServer(private val context: Context) {
 
     private var serverSocket: ServerSocket? = null
-    private val executor = Executors.newCachedThreadPool()
+    private var executor: ExecutorService? = null
     @Volatile
     private var running = false
 
@@ -26,12 +27,13 @@ class WifiTransferServer(private val context: Context) {
 
     val isRunning: Boolean get() = running
 
+    @Synchronized
     fun start(port: Int = 8080): Boolean {
         if (running) return true
         return try {
             serverSocket = ServerSocket(port, 50, InetAddress.getByName("0.0.0.0"))
-            // 随机令牌防局域网任意设备访问
-            accessToken = java.util.UUID.randomUUID().toString().replace("-", "").take(8)
+            accessToken = TransferSecurity.newToken()
+            executor = Executors.newFixedThreadPool(MAX_WORKERS)
             running = true
             Thread { acceptLoop() }.start()
             true
@@ -41,6 +43,7 @@ class WifiTransferServer(private val context: Context) {
         }
     }
 
+    @Synchronized
     fun stop() {
         running = false
         try {
@@ -48,6 +51,9 @@ class WifiTransferServer(private val context: Context) {
         } catch (_: Exception) {
         }
         serverSocket = null
+        executor?.shutdownNow()
+        executor = null
+        accessToken = ""
     }
 
     /** 获取带 token 的访问地址 */
@@ -60,7 +66,7 @@ class WifiTransferServer(private val context: Context) {
         while (running) {
             try {
                 val socket = serverSocket?.accept() ?: break
-                executor.execute { handle(socket) }
+                executor?.execute { handle(socket) } ?: socket.close()
             } catch (e: Exception) {
                 if (running) Log.e("DYAPP", "accept fail", e)
             }
@@ -86,7 +92,7 @@ class WifiTransferServer(private val context: Context) {
                 // Token 鉴权:防止局域网内任意设备访问
                 val query = path.substringAfter('?', "")
                 val token = query.split("&").firstOrNull { it.startsWith("token=") }?.substringAfter("=") ?: ""
-                if (accessToken.isNotEmpty() && token != accessToken) {
+                if (!TransferSecurity.tokenMatches(accessToken, token)) {
                     sendUnauthorized(out)
                     socket.close()
                     return
@@ -177,11 +183,15 @@ class WifiTransferServer(private val context: Context) {
             "json" -> "application/json"
             else -> "video/mp4"
         }
+        val attachmentName = TransferSecurity.sanitizeAttachmentName(name)
+        val encodedName = java.net.URLEncoder.encode(attachmentName, "UTF-8").replace("+", "%20")
         val header = (
             "HTTP/1.1 200 OK\r\n" +
                 "Content-Type: $mime\r\n" +
                 "Content-Length: ${file.length()}\r\n" +
-                "Content-Disposition: attachment; filename=\"${name}\"\r\n" +
+                "Content-Disposition: attachment; filename=\"$attachmentName\"; filename*=UTF-8''$encodedName\r\n" +
+                "X-Content-Type-Options: nosniff\r\n" +
+                "Cache-Control: no-store\r\n" +
                 "Connection: close\r\n\r\n"
             ).toByteArray()
         out.write(header)
@@ -208,6 +218,8 @@ class WifiTransferServer(private val context: Context) {
             "HTTP/1.1 $status" +
                 "Content-Type: $contentType\r\n" +
                 "Content-Length: ${body.size}\r\n" +
+                "Cache-Control: no-store\r\n" +
+                "X-Content-Type-Options: nosniff\r\n" +
                 "Connection: close\r\n\r\n"
             ).toByteArray()
         out.write(header)
@@ -233,5 +245,8 @@ class WifiTransferServer(private val context: Context) {
             "无法获取 IP(请确认已连接 WiFi)"
         }
     }
-}
 
+    private companion object {
+        const val MAX_WORKERS = 8
+    }
+}

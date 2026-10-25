@@ -162,11 +162,13 @@ object XhsSsrParser {
             streamCandidates
         }
         val videoUrl = candidates.firstOrNull()?.url.orEmpty()
-        val firstImageUrl = images?.optJSONObject(0).bestImageUrl().orEmpty()
-        val videoCover = video?.optJSONObject("cover")
-            ?.optJSONArray("urlList")
-            ?.optString(0)
-            .orEmpty()
+        val firstImageUrl = secureUrl(images?.optJSONObject(0).bestImageUrl().orEmpty())
+        val videoCover = secureUrl(
+            video?.optJSONObject("cover")
+                ?.optJSONArray("urlList")
+                ?.optString(0)
+                .orEmpty()
+        )
         val rawTime = note.optLong("time", 0)
         val interact = note.optJSONObject("interactInfo")
 
@@ -203,9 +205,11 @@ object XhsSsrParser {
                 val item = optJSONObject(index) ?: continue
                 val backupUrls = item.optJSONArray("backupUrls")
                     ?: item.optJSONArray("backup_urls")
-                val url = item.optString("masterUrl")
-                    .ifBlank { item.optString("master_url") }
-                    .ifBlank { backupUrls?.optString(0).orEmpty() }
+                val url = secureUrl(
+                    item.optString("masterUrl")
+                        .ifBlank { item.optString("master_url") }
+                        .ifBlank { backupUrls?.optString(0).orEmpty() }
+                )
                 if (url.isBlank()) continue
                 val bitrate = sequenceOf(
                     item.optLong("avgBitrate"),
@@ -303,8 +307,8 @@ object XhsSsrParser {
                 if (url.isBlank()) continue
                 add(
                     MediaImage(
-                        url = url,
-                        originalUrl = item.optString("originalImageUrl"),
+                        url = secureUrl(url),
+                        originalUrl = secureUrl(item.optString("originalImageUrl")),
                         width = item.optInt("width").coerceAtLeast(0),
                         height = item.optInt("height").coerceAtLeast(0),
                     )
@@ -377,4 +381,7 @@ object XhsSsrParser {
                 debugDetail = detail,
             )
         )
+
+    private fun secureUrl(url: String): String =
+        if (url.startsWith("http://")) "https://" + url.removePrefix("http://") else url
 }

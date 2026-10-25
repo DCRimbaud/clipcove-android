@@ -17,7 +17,7 @@
         android:label="ClipCove"
         android:icon="@mipmap/ic_launcher"
         android:theme="@style/Theme.ClipCove"
-        android:usesCleartextTraffic="true">
+        android:usesCleartextTraffic="false">
         <activity
             android:name=".MainActivity"
             android:exported="true"
