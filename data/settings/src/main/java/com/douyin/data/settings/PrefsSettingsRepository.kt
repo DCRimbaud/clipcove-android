@@ -15,6 +15,9 @@ class PrefsSettingsRepository(context: Context) : SettingsRepository {
     override val autoParseSharedLinks: StateFlow<Boolean> =
         MutableStateFlow(prefs.getBoolean(KEY_AUTO_PARSE_SHARED, true))
 
+    override val autoUpdateMirrors: StateFlow<Boolean> =
+        MutableStateFlow(prefs.getBoolean(KEY_AUTO_UPDATE_MIRRORS, true))
+
     override fun setAutoSave(value: Boolean) {
         prefs.edit().putBoolean(KEY_AUTO_SAVE, value).apply()
         (autoSaveToDownloads as MutableStateFlow).value = value
@@ -25,9 +28,15 @@ class PrefsSettingsRepository(context: Context) : SettingsRepository {
         (autoParseSharedLinks as MutableStateFlow).value = value
     }
 
+    override fun setAutoUpdateMirrors(value: Boolean) {
+        prefs.edit().putBoolean(KEY_AUTO_UPDATE_MIRRORS, value).apply()
+        (autoUpdateMirrors as MutableStateFlow).value = value
+    }
+
     private companion object {
         const val PREFS = "settings"
         const val KEY_AUTO_SAVE = "auto_save_downloads"
         const val KEY_AUTO_PARSE_SHARED = "auto_parse_shared_links"
+        const val KEY_AUTO_UPDATE_MIRRORS = "auto_update_mirrors"
     }
 }

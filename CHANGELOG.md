@@ -2,6 +2,22 @@
 
 All notable changes to ClipCove are documented here.
 
+## [1.2.0-rc.2] - 2026-10-26
+
+### Added
+
+- Automatic fallback through public GitHub download accelerators after direct downloads fail.
+- Setting to disable accelerator routes and enforce GitHub-only downloads.
+- Route-selection tests covering direct-only mode and non-GitHub URLs.
+
+### Security
+
+- Accelerated downloads still require the configured SHA-256, package, version, and signing-certificate checks.
+
+### Changed
+
+- Version name set to `1.2.0-rc.2` (`versionCode` 20).
+
 ## [1.2.0-rc.1] - 2026-10-26
 
 ### Added

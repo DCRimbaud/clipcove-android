@@ -13,6 +13,10 @@ interface SettingsRepository {
     /** Auto-parse links received through Android's share sheet. */
     val autoParseSharedLinks: StateFlow<Boolean>
 
+    /** Retry blocked GitHub release downloads through public accelerator mirrors. */
+    val autoUpdateMirrors: StateFlow<Boolean>
+
     fun setAutoSave(value: Boolean)
     fun setAutoParseSharedLinks(value: Boolean)
+    fun setAutoUpdateMirrors(value: Boolean)
 }

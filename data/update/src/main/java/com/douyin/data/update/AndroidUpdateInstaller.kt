@@ -31,6 +31,7 @@ class AndroidUpdateInstaller(
 
     override suspend fun downloadAndInstall(
         release: AppRelease,
+        allowMirrors: Boolean,
         onProgress: (Int) -> Unit,
     ): InstallResult = withContext(Dispatchers.IO) {
         if (!canRequestInstall()) {
@@ -43,7 +44,7 @@ class AndroidUpdateInstaller(
         val checksumAsset = release.assets.firstOrNull {
             it.name.endsWith(".sha256", ignoreCase = true)
         } ?: throw UpdateException("该版本缺少校验文件，请打开 GitHub 发布页手动下载")
-        val expectedHash = fetchChecksum(checksumAsset)
+        val expectedHash = fetchChecksum(checksumAsset, allowMirrors)
             ?: throw UpdateException("更新包校验文件无效，请稍后重试")
 
         val updateDir = File(appContext.cacheDir, "updates").apply { mkdirs() }
@@ -61,6 +62,7 @@ class AndroidUpdateInstaller(
                 asset = apkAsset,
                 destination = apkFile,
                 partFile = partFile,
+                allowMirrors = allowMirrors,
                 onProgress = onProgress,
             )
         }
@@ -107,47 +109,64 @@ class AndroidUpdateInstaller(
         }
     }
 
-    private fun fetchChecksum(asset: ReleaseAsset): String? {
-        val request = Request.Builder()
-            .url(asset.downloadUrl)
-            .header("User-Agent", USER_AGENT)
-            .get()
-            .build()
-        client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) throw HttpStatusException(response.code)
-            val text = response.body?.string().orEmpty()
-            return UpdatePackageVerifier.parseExpectedSha256(text)
+    private fun fetchChecksum(asset: ReleaseAsset, allowMirrors: Boolean): String? {
+        var lastError: Exception? = null
+        for (url in UpdateDownloadRoutes.candidates(asset.downloadUrl, allowMirrors)) {
+            try {
+                val request = Request.Builder()
+                    .url(url)
+                    .header("User-Agent", USER_AGENT)
+                    .get()
+                    .build()
+                client.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) throw HttpStatusException(response.code)
+                    val text = response.body?.string().orEmpty()
+                    return UpdatePackageVerifier.parseExpectedSha256(text)
+                }
+            } catch (error: Exception) {
+                lastError = error
+            }
         }
+        throw lastError ?: UpdateException("无法下载更新校验文件")
     }
 
     private suspend fun downloadAsset(
         asset: ReleaseAsset,
         destination: File,
         partFile: File,
+        allowMirrors: Boolean,
         onProgress: (Int) -> Unit,
     ) {
-        var attempt = 0
-        while (true) {
-            try {
-                downloadAttempt(asset, destination, partFile, onProgress)
-                return
-            } catch (error: Exception) {
-                if (attempt >= MAX_RETRIES || !isRetryable(error)) throw error
-                attempt++
-                delay(1_000L * attempt)
+        var lastError: Exception? = null
+        for (url in UpdateDownloadRoutes.candidates(asset.downloadUrl, allowMirrors)) {
+            var attempt = 0
+            while (attempt <= MAX_RETRIES_PER_SOURCE) {
+                try {
+                    downloadAttempt(asset, url, destination, partFile, onProgress)
+                    return
+                } catch (error: Exception) {
+                    lastError = error
+                    if (attempt >= MAX_RETRIES_PER_SOURCE || !isRetryable(error)) break
+                    attempt++
+                    delay(1_000L * attempt)
+                }
             }
         }
+        throw UpdateException(
+            "所有下载线路均失败，请检查网络或打开 GitHub 发布页手动下载"
+        ).also { error -> lastError?.let(error::initCause) }
     }
 
     private fun downloadAttempt(
         asset: ReleaseAsset,
+        downloadUrl: String,
         destination: File,
         partFile: File,
         onProgress: (Int) -> Unit,
     ) {
         val startBytes = partFile.length()
         val request = Request.Builder()
-            .url(asset.downloadUrl)
+            .url(downloadUrl)
             .header("User-Agent", USER_AGENT)
             .apply { if (startBytes > 0) header("Range", "bytes=$startBytes-") }
             .get()
@@ -312,12 +331,12 @@ class AndroidUpdateInstaller(
     private class HttpStatusException(val code: Int) : IOException("HTTP $code")
 
     private companion object {
-        const val MAX_RETRIES = 2
+        const val MAX_RETRIES_PER_SOURCE = 1
         const val USER_AGENT = "ClipCove-Android-Updater"
 
         fun defaultClient(): OkHttpClient = OkHttpClient.Builder()
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(60, TimeUnit.SECONDS)
+            .connectTimeout(12, TimeUnit.SECONDS)
+            .readTimeout(45, TimeUnit.SECONDS)
             .callTimeout(10, TimeUnit.MINUTES)
             .followRedirects(true)
             .build()

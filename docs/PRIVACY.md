@@ -36,7 +36,7 @@ Diagnostics are bounded and can be cleared from Settings. Sanitization is best-e
 
 ## In-App Updates
 
-When the user chooses to install an available update, ClipCove downloads the APK and checksum from the public GitHub Release. It verifies the file size, SHA-256 checksum, package name, version code, version name, and signing certificate before opening Android's package installer. Android requires the user to grant install permission and confirm the final installation step.
+When the user chooses to install an available update, ClipCove downloads the APK and checksum from the public GitHub Release. If direct GitHub download fails and accelerators are enabled, ClipCove may retry through configured public GitHub proxy services; those services can observe request metadata such as the device IP address. The downloaded package must still pass SHA-256, package, version, and signing-certificate verification. It verifies the file size, SHA-256 checksum, package name, version code, version name, and signing certificate before opening Android's package installer. Android requires the user to grant install permission and confirm the final installation step.
 
 ## Backups
 

@@ -43,6 +43,7 @@ class SettingsViewModel(
 
     val autoSave: StateFlow<Boolean> = settingsRepo.autoSaveToDownloads
     val autoParseSharedLinks: StateFlow<Boolean> = settingsRepo.autoParseSharedLinks
+    val autoUpdateMirrors: StateFlow<Boolean> = settingsRepo.autoUpdateMirrors
 
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message
@@ -61,6 +62,11 @@ class SettingsViewModel(
     fun setAutoParseSharedLinks(value: Boolean) {
         settingsRepo.setAutoParseSharedLinks(value)
         _message.value = if (value) "分享链接导入后将自动解析" else "分享链接仅填入输入框"
+    }
+
+    fun setAutoUpdateMirrors(value: Boolean) {
+        settingsRepo.setAutoUpdateMirrors(value)
+        _message.value = if (value) "GitHub 下载失败时会自动尝试加速线路" else "更新将仅使用 GitHub 直连"
     }
 
     fun toggleWifi() {
@@ -147,7 +153,10 @@ class SettingsViewModel(
         viewModelScope.launch {
             _updateState.value = UpdateUiState.Downloading(release, 0)
             try {
-                val result = updateInstaller.downloadAndInstall(release) { progress ->
+                val result = updateInstaller.downloadAndInstall(
+                    release = release,
+                    allowMirrors = settingsRepo.autoUpdateMirrors.value,
+                ) { progress ->
                     if (progress < 100) {
                         _updateState.value = UpdateUiState.Downloading(release, progress)
                     }
