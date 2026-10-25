@@ -48,6 +48,7 @@ Test at least once per release on a clean install:
 - Clear-all confirmation
 - Diagnostic export with a simulated failure
 - GitHub update check while offline and online
+- In-app update permission prompt, checksum validation, signature validation, download resume, and installer launch
 - Download pause, resume, retry, and cancel
 - Android 7.0 behavior for public Downloads export
 

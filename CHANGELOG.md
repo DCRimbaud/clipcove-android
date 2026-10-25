@@ -2,6 +2,24 @@
 
 All notable changes to ClipCove are documented here.
 
+## [1.1.2] - 2026-10-26
+
+### Added
+
+- In-app update download with resumable transfer, automatic retries, progress, and storage checks.
+- SHA-256, package name, version code, and signing-certificate verification before installation.
+- Automatic launch of Android's package installer with a GitHub fallback for manual installation.
+
+### Changed
+
+- Update downloads request unknown-app-source permission before consuming mobile data.
+- Version bumped to `1.1.2` (`versionCode` 18).
+
+### Security
+
+- Downloaded updates must match the installed application's signing certificate.
+- Releases without an APK checksum asset are rejected for in-app installation.
+
 ## [1.1.1] - 2026-10-26
 
 ### Added

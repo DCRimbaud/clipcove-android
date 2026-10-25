@@ -20,6 +20,7 @@ ClipCove is a local-first Android media downloader for **Douyin** and **Xiaohong
 - Local favorites and history that retain source URLs for reliable re-resolution
 - Versioned backup export and restore, including legacy backup compatibility
 - Sanitized local parser diagnostics and manual GitHub release checks
+- In-app update download with SHA-256, package, version, and signing-certificate verification
 - Clear-all data control and configurable release signing
 - Live Photo and audio merging with FFmpeg
 - Built-in WiFi transfer server for moving files to a computer
@@ -120,6 +121,7 @@ Versions before `1.0.2` used a different package ID. Uninstall the old test buil
 - Xiaohongshu `xsec_token` values expire, so old share links must be copied again.
 - Anonymous parsing may hit rate limits or verification challenges.
 - Current GitHub release artifacts use debug signing. Configure your own release keystore before production distribution.
+- Android always displays a final system installation confirmation; ordinary apps cannot silently install updates.
 - ClipCove does not provide account login, bulk scraping, proxy pools, or commercial collection features.
 
 ## Documentation

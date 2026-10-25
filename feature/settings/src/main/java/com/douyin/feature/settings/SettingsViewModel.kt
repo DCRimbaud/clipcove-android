@@ -8,7 +8,9 @@ import com.douyin.data.favorites.FavoritesRepository
 import com.douyin.data.history.HistoryRepository
 import com.douyin.data.settings.SettingsRepository
 import com.douyin.data.update.AppRelease
+import com.douyin.data.update.InstallResult
 import com.douyin.data.update.ReleaseSelector
+import com.douyin.data.update.UpdateInstaller
 import com.douyin.data.update.UpdateRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -19,7 +21,10 @@ sealed interface UpdateUiState {
     data object Checking : UpdateUiState
     data object UpToDate : UpdateUiState
     data class Available(val release: AppRelease) : UpdateUiState
-    data class Failed(val message: String) : UpdateUiState
+    data class Downloading(val release: AppRelease, val progress: Int) : UpdateUiState
+    data class PermissionRequired(val release: AppRelease) : UpdateUiState
+    data class InstallReady(val release: AppRelease) : UpdateUiState
+    data class Failed(val message: String, val release: AppRelease? = null) : UpdateUiState
 }
 
 /** Settings coordinator for preferences, local data, diagnostics, and update checks. */
@@ -30,6 +35,7 @@ class SettingsViewModel(
     private val favoritesRepo: FavoritesRepository,
     private val diagnosticsRepo: DiagnosticsRepository,
     private val updateRepository: UpdateRepository,
+    private val updateInstaller: UpdateInstaller,
     val wifiTransfer: WifiTransferController,
     val versionName: String,
     val versionCode: Int,
@@ -121,7 +127,9 @@ class SettingsViewModel(
     fun exportDiagnostics(): String = diagnosticsRepo.exportReport(versionName, versionCode)
 
     fun checkForUpdate() {
-        if (_updateState.value == UpdateUiState.Checking) return
+        if (_updateState.value is UpdateUiState.Checking ||
+            _updateState.value is UpdateUiState.Downloading
+        ) return
         _updateState.value = UpdateUiState.Checking
         viewModelScope.launch {
             _updateState.value = try {
@@ -131,6 +139,38 @@ class SettingsViewModel(
                 UpdateUiState.Failed(e.message ?: "检查更新失败，请稍后重试")
             }
         }
+    }
+
+    fun downloadAndInstallUpdate() {
+        val release = _updateState.value.pendingRelease() ?: return
+        if (_updateState.value is UpdateUiState.Downloading) return
+        viewModelScope.launch {
+            _updateState.value = UpdateUiState.Downloading(release, 0)
+            try {
+                val result = updateInstaller.downloadAndInstall(release) { progress ->
+                    if (progress < 100) {
+                        _updateState.value = UpdateUiState.Downloading(release, progress)
+                    }
+                }
+                _updateState.value = when (result) {
+                    InstallResult.InstallerOpened -> UpdateUiState.InstallReady(release)
+                    InstallResult.PermissionRequired -> UpdateUiState.PermissionRequired(release)
+                }
+            } catch (e: Exception) {
+                _updateState.value = UpdateUiState.Failed(
+                    message = e.message ?: "下载或安装更新失败，请稍后重试",
+                    release = release,
+                )
+            }
+        }
+    }
+
+    private fun UpdateUiState.pendingRelease(): AppRelease? = when (this) {
+        is UpdateUiState.Available -> release
+        is UpdateUiState.PermissionRequired -> release
+        is UpdateUiState.InstallReady -> release
+        is UpdateUiState.Failed -> release
+        else -> null
     }
 
     fun reportFileReadError() {

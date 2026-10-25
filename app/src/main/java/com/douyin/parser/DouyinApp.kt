@@ -14,7 +14,9 @@ import com.douyin.data.settings.SettingsRepository
 import com.douyin.data.favorites.FavoritesRepository
 import com.douyin.data.favorites.PrefsFavoritesRepository
 import com.douyin.data.transfer.WifiTransferServer
+import com.douyin.data.update.AndroidUpdateInstaller
 import com.douyin.data.update.GitHubUpdateRepository
+import com.douyin.data.update.UpdateInstaller
 import com.douyin.data.update.UpdateRepository
 import com.douyin.data.xhs.XhsRepository
 import com.douyin.feature.home.HomeViewModel
@@ -38,6 +40,12 @@ val appModule = module {
     single<FavoritesRepository> { PrefsFavoritesRepository(androidContext()) }
     single<DiagnosticsRepository> { PrefsDiagnosticsRepository(androidContext()) }
     single<UpdateRepository> { GitHubUpdateRepository() }
+    single<UpdateInstaller> {
+        AndroidUpdateInstaller(
+            context = androidContext(),
+            fileProviderAuthority = "${androidContext().packageName}.fileprovider",
+        )
+    }
     single { WifiTransferServer(androidContext()) }
     single { WifiTransferController(get()) }
 
@@ -59,6 +67,7 @@ val appModule = module {
 
     viewModel {
         SettingsViewModel(
+            get(),
             get(),
             get(),
             get(),

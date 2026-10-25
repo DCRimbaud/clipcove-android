@@ -1,4 +1,4 @@
-﻿import java.util.Properties
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
@@ -9,9 +9,9 @@ plugins {
 // Stable releases use 1.x.x; reserve 2.x.x for a major architecture change.
 val versionMajor = 1
 val versionMinor = 1
-val versionPatch = 1
+val versionPatch = 2
 val appVersionName = "$versionMajor.$versionMinor.$versionPatch"
-val appVersionCode = 17
+val appVersionCode = 18
 
 val keystorePropertiesFile = rootProject.file("keystore.properties")
 val keystoreProperties = Properties().apply {
