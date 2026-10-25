@@ -109,7 +109,7 @@ class DouyinMediaMapperTest {
 
         val media = (result as ParseResult.Success).media
         assertEquals(1, media.images.size)
-        assertEquals("https://example.com/a-original.jpg", media.images.single().preferredUrl)
+        assertEquals("https://example.com/a.jpg", media.images.single().preferredUrl)
         assertEquals("https://example.com/a.mp4", media.images.single().livePhotoUrl)
         assertTrue(media.hasImages)
     }

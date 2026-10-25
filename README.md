@@ -27,7 +27,8 @@ ClipCove is a local-first Android media downloader for **Douyin** and **Xiaohong
 - Clear-all data control and configurable release signing
 - Live Photo and audio merging with FFmpeg
 - Built-in WiFi transfer server for moving files to a computer
-- Dark Jetpack Compose UI with Android 7.0+ support (minSdk 24)
+- Refined dark Jetpack Compose UI with restrained motion, press feedback, and animated progress states
+- Android 7.0+ support (minSdk 24)
 
 ## Tech Stack
 

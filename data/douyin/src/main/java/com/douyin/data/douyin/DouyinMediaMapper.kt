@@ -155,7 +155,9 @@ object DouyinMediaMapper {
                 add(
                     MediaImage(
                         url = url,
-                        originalUrl = secureUrl(item.optString("original_url")),
+                        // Douyin's original_url is synthesized by stripping signed CDN transforms;
+                        // the resulting path returns HTTP 403, so keep the accessible direct URL.
+                        originalUrl = "",
                         livePhotoUrl = secureUrl(item.optString("gif_url")),
                         width = item.optInt("width").coerceAtLeast(0),
                         height = item.optInt("height").coerceAtLeast(0),

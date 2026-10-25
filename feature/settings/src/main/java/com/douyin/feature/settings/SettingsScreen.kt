@@ -11,8 +11,15 @@ import android.provider.MediaStore
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -30,6 +37,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Delete
@@ -48,6 +56,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -80,6 +89,7 @@ import com.douyin.core.designsystem.DyCyan
 import com.douyin.core.designsystem.DyGreen
 import com.douyin.core.designsystem.DyIconTile
 import com.douyin.core.designsystem.DyInput
+import com.douyin.core.designsystem.DyMotion
 import com.douyin.core.designsystem.DyPageHeader
 import com.douyin.core.designsystem.DyPanel
 import com.douyin.core.designsystem.DyPill
@@ -87,6 +97,7 @@ import com.douyin.core.designsystem.DyRed
 import com.douyin.core.designsystem.DySectionHeader
 import com.douyin.core.designsystem.DyText
 import com.douyin.core.designsystem.DyTextSecondary
+import com.douyin.core.designsystem.dyPressable
 import com.douyin.data.update.AppRelease
 import java.io.File
 
@@ -100,6 +111,31 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
     val wifiUrl by viewModel.wifiUrl.collectAsStateWithLifecycle()
     val updateState by viewModel.updateState.collectAsStateWithLifecycle()
     val updateRelease = updateState.pendingRelease()
+    val updateProgress by animateFloatAsState(
+        targetValue = (updateState as? UpdateUiState.Downloading)?.progress?.div(100f) ?: 0f,
+        animationSpec = tween(DyMotion.StandardMs, easing = DyMotion.StandardEasing),
+        label = "settingsUpdateProgress",
+    )
+    val updateTint by animateColorAsState(
+        targetValue = when (updateState) {
+            UpdateUiState.UpToDate,
+            is UpdateUiState.InstallReady -> DyGreen
+            is UpdateUiState.PermissionRequired -> DyAmber
+            is UpdateUiState.Failed -> DyRed
+            is UpdateUiState.Available,
+            is UpdateUiState.Downloading -> DyAmber
+            else -> DyCyan
+        },
+        animationSpec = tween(DyMotion.StandardMs, easing = DyMotion.StandardEasing),
+        label = "settingsUpdateTint",
+    )
+    val updateIcon = when (updateState) {
+        UpdateUiState.UpToDate,
+        is UpdateUiState.InstallReady -> Icons.Filled.CheckCircle
+        is UpdateUiState.Available,
+        is UpdateUiState.Downloading -> Icons.Filled.Download
+        else -> Icons.Filled.SystemUpdate
+    }
     val context = LocalContext.current
     var showChangelog by remember { mutableStateOf(false) }
     var showClearAllConfirm by remember { mutableStateOf(false) }
@@ -219,15 +255,33 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                     }
                 },
             )
-            if (wifiRunning && wifiUrl.isNotBlank()) {
-                HorizontalDivider(color = DyBorder.copy(alpha = 0.6f))
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text("访问地址", style = MaterialTheme.typography.bodySmall, color = DyTextSecondary)
-                    Spacer(Modifier.weight(1f))
-                    Text(wifiUrl, style = MaterialTheme.typography.labelLarge, color = DyCyan, maxLines = 1)
+            AnimatedVisibility(
+                visible = wifiRunning && wifiUrl.isNotBlank(),
+                enter = fadeIn(tween(DyMotion.StandardMs, easing = DyMotion.StandardEasing)) +
+                    expandVertically(
+                        animationSpec = tween(
+                            DyMotion.StandardMs,
+                            easing = DyMotion.EmphasizedEasing,
+                        )
+                    ),
+                exit = fadeOut(tween(DyMotion.QuickMs, easing = DyMotion.StandardEasing)) +
+                    shrinkVertically(
+                        animationSpec = tween(
+                            DyMotion.QuickMs,
+                            easing = DyMotion.StandardEasing,
+                        )
+                    ),
+            ) {
+                Column {
+                    HorizontalDivider(color = DyBorder.copy(alpha = 0.6f))
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("访问地址", style = MaterialTheme.typography.bodySmall, color = DyTextSecondary)
+                        Spacer(Modifier.weight(1f))
+                        Text(wifiUrl, style = MaterialTheme.typography.labelLarge, color = DyCyan, maxLines = 1)
+                    }
                 }
             }
         }
@@ -296,8 +350,8 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             )
             HorizontalDivider(color = DyBorder.copy(alpha = 0.6f))
             ActionRow(
-                icon = Icons.Filled.SystemUpdate,
-                tint = DyCyan,
+                icon = updateIcon,
+                tint = updateTint,
                 title = updateActionTitle(updateState),
                 description = updateActionDescription(updateState, autoUpdateMirrors),
                 onClick = {
@@ -310,6 +364,32 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                     }
                 },
             )
+            AnimatedVisibility(
+                visible = updateState is UpdateUiState.Downloading,
+                enter = fadeIn(tween(DyMotion.QuickMs, easing = DyMotion.StandardEasing)) +
+                    expandVertically(
+                        animationSpec = tween(
+                            DyMotion.QuickMs,
+                            easing = DyMotion.StandardEasing,
+                        )
+                    ),
+                exit = fadeOut(tween(DyMotion.QuickMs, easing = DyMotion.StandardEasing)) +
+                    shrinkVertically(
+                        animationSpec = tween(
+                            DyMotion.QuickMs,
+                            easing = DyMotion.StandardEasing,
+                        )
+                    ),
+            ) {
+                Column(Modifier.fillMaxWidth().padding(start = 66.dp, end = 14.dp, bottom = 12.dp)) {
+                    LinearProgressIndicator(
+                        progress = { updateProgress },
+                        modifier = Modifier.fillMaxWidth().height(3.dp),
+                        color = updateTint,
+                        trackColor = DyInput,
+                    )
+                }
+            }
             if (updateRelease != null) {
                 HorizontalDivider(color = DyBorder.copy(alpha = 0.6f))
                 ActionRow(
@@ -463,7 +543,10 @@ private fun ActionRow(
     onClick: () -> Unit,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(14.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .dyPressable(pressedScale = 0.99f, onClick = onClick)
+            .padding(14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {

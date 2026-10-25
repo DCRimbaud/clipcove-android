@@ -1,12 +1,13 @@
 package com.douyin.feature.home
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -82,12 +83,14 @@ import com.douyin.core.designsystem.DyCard
 import com.douyin.core.designsystem.DyCyan
 import com.douyin.core.designsystem.DyGreen
 import com.douyin.core.designsystem.DyIconTile
+import com.douyin.core.designsystem.DyMotion
 import com.douyin.core.designsystem.DyInput
 import com.douyin.core.designsystem.DyPill
 import com.douyin.core.designsystem.DyRed
 import com.douyin.core.designsystem.DySurfaceHigh
 import com.douyin.core.designsystem.DyText
 import com.douyin.core.designsystem.DyTextSecondary
+import com.douyin.core.designsystem.dyPressable
 import com.douyin.core.model.MediaImage
 import com.douyin.core.model.MediaInfo
 import com.douyin.core.model.MediaPlatform
@@ -136,6 +139,16 @@ internal fun ResultCard(
     var selectedCandidateIndex by remember(media.id) { mutableIntStateOf(initialCandidateIndex) }
     val selectedCandidate = candidates.getOrNull(selectedCandidateIndex)
     val previewUrl = selectedCandidate?.url ?: media.videoUrl
+    val favoriteTint by animateColorAsState(
+        targetValue = if (isFavorite) DyRed else DyTextSecondary,
+        animationSpec = tween(DyMotion.QuickMs, easing = DyMotion.StandardEasing),
+        label = "favoriteTint",
+    )
+    val favoriteContainer by animateColorAsState(
+        targetValue = if (isFavorite) DyRed.copy(alpha = 0.08f) else Color.Transparent,
+        animationSpec = tween(DyMotion.QuickMs, easing = DyMotion.StandardEasing),
+        label = "favoriteContainer",
+    )
     val downloadVideo = {
         if (previewUrl.isNotBlank()) {
             onDownload(title, safeFilename(title, "mp4"), previewUrl)
@@ -156,8 +169,11 @@ internal fun ResultCard(
     }
     LaunchedEffect(isFavorite) {
         if (isFavorite) {
-            favoriteScale.snapTo(0.75f)
-            favoriteScale.animateTo(1.18f, spring(dampingRatio = Spring.DampingRatioMediumBouncy))
+            favoriteScale.snapTo(0.82f)
+            favoriteScale.animateTo(
+                1.08f,
+                spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium),
+            )
             favoriteScale.animateTo(1f, spring(dampingRatio = Spring.DampingRatioNoBouncy))
         }
     }
@@ -237,13 +253,13 @@ internal fun ResultCard(
                         shape = RoundedCornerShape(14.dp),
                         border = BorderStroke(1.dp, if (isFavorite) DyRed.copy(alpha = 0.7f) else DyBorder),
                         colors = ButtonDefaults.outlinedButtonColors(
-                            containerColor = if (isFavorite) DyRed.copy(alpha = 0.08f) else Color.Transparent,
+                            containerColor = favoriteContainer,
                         ),
                     ) {
                         Icon(
                             if (isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                             contentDescription = null,
-                            tint = if (isFavorite) DyRed else DyTextSecondary,
+                            tint = favoriteTint,
                             modifier = Modifier
                                 .size(18.dp)
                                 .graphicsLayer {
@@ -399,14 +415,23 @@ private fun VideoCandidateSelector(
         }
         candidates.forEachIndexed { index, candidate ->
             val selected = index == selectedIndex
+            val selectionColor by animateColorAsState(
+                targetValue = if (selected) DyRed.copy(alpha = 0.08f) else DyInput,
+                animationSpec = tween(DyMotion.StandardMs, easing = DyMotion.StandardEasing),
+                label = "candidateColor_$index",
+            )
+            val selectionBorder by animateColorAsState(
+                targetValue = if (selected) DyRed.copy(alpha = 0.68f) else DyBorder.copy(alpha = 0.62f),
+                animationSpec = tween(DyMotion.StandardMs, easing = DyMotion.StandardEasing),
+                label = "candidateBorder_$index",
+            )
             Surface(
-                modifier = Modifier.fillMaxWidth().clickable { onSelected(index) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .dyPressable(pressedScale = 0.985f) { onSelected(index) },
                 shape = RoundedCornerShape(14.dp),
-                color = if (selected) DyRed.copy(alpha = 0.08f) else DyInput,
-                border = BorderStroke(
-                    1.dp,
-                    if (selected) DyRed.copy(alpha = 0.68f) else DyBorder.copy(alpha = 0.62f),
-                ),
+                color = selectionColor,
+                border = BorderStroke(1.dp, selectionBorder),
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 9.dp, vertical = 8.dp),
@@ -535,7 +560,7 @@ private fun MediaPreview(
                 Modifier
                     .fillMaxWidth()
                     .aspectRatio(16f / 10f)
-                    .clickable { onOpenImage(0) },
+                    .dyPressable(pressedScale = 0.99f) { onOpenImage(0) },
             ) {
                 AsyncImage(
                     model = media.coverUrl.ifBlank { media.images.first().preferredUrl },
@@ -685,7 +710,7 @@ private fun ImageTile(
                 .fillMaxWidth()
                 .aspectRatio(1f)
                 .clip(RoundedCornerShape(16.dp))
-                .clickable(onClick = onOpen),
+                .dyPressable(pressedScale = 0.985f, onClick = onOpen),
         ) {
             AsyncImage(
                 model = image.url,
@@ -748,7 +773,9 @@ private fun ImageTile(
 @Composable
 internal fun HistoryCard(item: HistoryItem, onClick: (HistoryItem) -> Unit) {
     Surface(
-        modifier = Modifier.fillMaxWidth().clickable { onClick(item) },
+        modifier = Modifier
+            .fillMaxWidth()
+            .dyPressable(pressedScale = 0.985f) { onClick(item) },
         shape = RoundedCornerShape(18.dp),
         color = DyCard,
         border = BorderStroke(1.dp, DyBorder.copy(alpha = 0.62f)),

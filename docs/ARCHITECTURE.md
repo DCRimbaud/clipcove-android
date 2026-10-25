@@ -59,7 +59,7 @@ shared text or URL
 
 ## Update Checks
 
-`data:update` queries the public GitHub Releases API only after a manual user action. Release selection parses numeric semantic versions and accepts prereleases by default because ClipCove currently publishes prerelease artifacts.
+`data:update` queries the public GitHub Releases API only after a manual user action. Release selection parses numeric semantic versions; prerelease tags are considered so users can still discover candidate builds explicitly published by the project.
 
 ## Adding A Platform
 

@@ -2,6 +2,28 @@
 
 All notable changes to ClipCove are documented here.
 
+## [1.2.0] - 2026-10-26
+
+### Added
+
+- A restrained Compose motion system with ambient surfaces, page transitions, press feedback, animated loading and empty states, download progress, and update progress.
+- Clearer visual hierarchy for page headers, section dividers, icon tiles, cards, and primary actions.
+
+### Fixed
+
+- Douyin image-note downloads now use the signed JPEG URL returned by the detail API instead of a synthesized original URL that returned HTTP 403.
+- Image notes now download as watermark-free JPEG files with the correct extension.
+
+### Security
+
+- Hardened LAN transfer with a 256-bit random token, constant-time comparison, bounded workers, response-header validation, and no-store response headers.
+- Enforced HTTPS for supported media URLs and improved update download validation.
+
+### Changed
+
+- Version name set to `1.2.0` (`versionCode` 21).
+- The built-in changelog now shows only the current release highlights.
+
 ## [1.2.0-rc.2] - 2026-10-26
 
 ### Added

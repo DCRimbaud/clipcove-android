@@ -10,9 +10,9 @@ plugins {
 val versionMajor = 1
 val versionMinor = 2
 val versionPatch = 0
-val versionSuffix = "-rc.2"
+val versionSuffix = ""
 val appVersionName = "$versionMajor.$versionMinor.$versionPatch$versionSuffix"
-val appVersionCode = 20
+val appVersionCode = 21
 
 val keystorePropertiesFile = rootProject.file("keystore.properties")
 val keystoreProperties = Properties().apply {

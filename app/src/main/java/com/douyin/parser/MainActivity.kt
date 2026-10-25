@@ -5,10 +5,12 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,7 +38,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -44,19 +46,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.douyin.core.designsystem.DyBg
-import com.douyin.core.designsystem.DyBgGlow
+import com.douyin.core.designsystem.DyAmbientBackground
 import com.douyin.core.designsystem.DyBorder
 import com.douyin.core.designsystem.DyCard
+import com.douyin.core.designsystem.DyMotion
 import com.douyin.core.designsystem.DyRed
 import com.douyin.core.designsystem.DyText
 import com.douyin.core.designsystem.DyTextSecondary
 import com.douyin.core.designsystem.DyTheme
+import com.douyin.core.designsystem.dyPressable
 import com.douyin.core.model.MediaPlatform
 import com.douyin.data.download.DownloadRepository
 import com.douyin.data.favorites.FavoritesRepository
@@ -84,16 +86,7 @@ class MainActivity : ComponentActivity() {
                 androidx.lifecycle.compose.LocalLifecycleOwner provides this
             ) {
                 DyTheme {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                Brush.verticalGradient(
-                                    colors = listOf(DyBgGlow, DyBg, DyBg),
-                                    endY = 760f,
-                                )
-                            )
-                    ) {
+                    DyAmbientBackground(modifier = Modifier.fillMaxSize()) {
                         DyNavHost(downloadRepository, favoritesRepository, pendingIntent)
                     }
                 }
@@ -166,10 +159,38 @@ private fun DyNavHost(
             navController = navController,
             startDestination = "home",
             modifier = Modifier.padding(padding),
-            enterTransition = { androidx.compose.animation.fadeIn(tween(220)) },
-            exitTransition = { androidx.compose.animation.fadeOut(tween(140)) },
-            popEnterTransition = { androidx.compose.animation.fadeIn(tween(220)) },
-            popExitTransition = { androidx.compose.animation.fadeOut(tween(140)) },
+            enterTransition = {
+                androidx.compose.animation.fadeIn(
+                    tween(DyMotion.StandardMs, easing = DyMotion.StandardEasing)
+                ) + slideInHorizontally(
+                    animationSpec = tween(DyMotion.StandardMs, easing = DyMotion.StandardEasing),
+                    initialOffsetX = { it / 14 },
+                )
+            },
+            exitTransition = {
+                androidx.compose.animation.fadeOut(
+                    tween(DyMotion.QuickMs, easing = DyMotion.StandardEasing)
+                ) + slideOutHorizontally(
+                    animationSpec = tween(DyMotion.QuickMs, easing = DyMotion.StandardEasing),
+                    targetOffsetX = { -it / 24 },
+                )
+            },
+            popEnterTransition = {
+                androidx.compose.animation.fadeIn(
+                    tween(DyMotion.StandardMs, easing = DyMotion.StandardEasing)
+                ) + slideInHorizontally(
+                    animationSpec = tween(DyMotion.StandardMs, easing = DyMotion.StandardEasing),
+                    initialOffsetX = { -it / 14 },
+                )
+            },
+            popExitTransition = {
+                androidx.compose.animation.fadeOut(
+                    tween(DyMotion.QuickMs, easing = DyMotion.StandardEasing)
+                ) + slideOutHorizontally(
+                    animationSpec = tween(DyMotion.QuickMs, easing = DyMotion.StandardEasing),
+                    targetOffsetX = { it / 24 },
+                )
+            },
         ) {
             composable("home") {
                 val vm: com.douyin.feature.home.HomeViewModel = koinViewModel()
@@ -282,29 +303,49 @@ private fun DyBottomNavigation(
                 destinations.forEach { dest ->
                     val selected = currentRoute == dest.route
                     val background by animateColorAsState(
-                        targetValue = if (selected) DyRed.copy(alpha = 0.15f) else Color.Transparent,
-                        animationSpec = tween(180),
+                        targetValue = if (selected) DyRed.copy(alpha = 0.16f) else Color.Transparent,
+                        animationSpec = tween(DyMotion.StandardMs, easing = DyMotion.StandardEasing),
                         label = "navBackground",
+                    )
+                    val iconScale by animateFloatAsState(
+                        targetValue = if (selected) 1.06f else 0.97f,
+                        animationSpec = tween(DyMotion.StandardMs, easing = DyMotion.StandardEasing),
+                        label = "navIconScale",
+                    )
+                    val iconTint by animateColorAsState(
+                        targetValue = if (selected) DyRed else DyTextSecondary,
+                        animationSpec = tween(DyMotion.QuickMs, easing = DyMotion.StandardEasing),
+                        label = "navIconTint",
+                    )
+                    val labelTint by animateColorAsState(
+                        targetValue = if (selected) DyRed else DyTextSecondary,
+                        animationSpec = tween(DyMotion.QuickMs, easing = DyMotion.StandardEasing),
+                        label = "navLabelTint",
                     )
                     Column(
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(18.dp))
                             .background(background)
-                            .clickable { onNavigate(dest) }
+                            .dyPressable(pressedScale = 0.94f) { onNavigate(dest) }
                             .padding(vertical = 7.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         Icon(
                             dest.icon,
                             contentDescription = dest.label,
-                            tint = if (selected) DyRed else DyTextSecondary,
-                            modifier = Modifier.size(21.dp),
+                            tint = iconTint,
+                            modifier = Modifier
+                                .size(21.dp)
+                                .graphicsLayer {
+                                    scaleX = iconScale
+                                    scaleY = iconScale
+                                },
                         )
                         Spacer(Modifier.height(3.dp))
                         Text(
                             dest.label,
-                            color = if (selected) DyRed else DyTextSecondary,
+                            color = labelTint,
                             fontSize = 10.sp,
                             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
                         )
