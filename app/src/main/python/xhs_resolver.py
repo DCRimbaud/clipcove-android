@@ -8,8 +8,8 @@ from urllib.parse import urlparse
 import requests
 
 UA = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
+    "Mozilla/5.0 (Linux; Android 14; Pixel 6) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36"
 )
 HOME_URL = "https://www.xiaohongshu.com/explore"
 ALLOWED_SUFFIXES = ("xiaohongshu.com", "xhslink.com", "xhslink.cn")
@@ -25,6 +25,11 @@ def _failure(code: str, message: str, detail: str = "") -> str:
 def _allowed(url: str) -> bool:
     host = (urlparse(url).hostname or "").lower()
     return any(host == suffix or host.endswith("." + suffix) for suffix in ALLOWED_SUFFIXES)
+
+
+def _has_note_payload(page: str) -> bool:
+    """桌面 SSR 和移动端 SSR 使用不同的数据根节点。"""
+    return "noteDetailMap" in page or ("noteData" in page and "noteId" in page)
 
 
 def fetch_page(url: str) -> str:
@@ -45,7 +50,7 @@ def fetch_page(url: str) -> str:
             return _failure("INVALID_LINK", "小红书短链跳转到了非官方域名", response.url[:200])
 
         # 部分网络环境首次请求只返回通用页，建立首页会话后再取一次。
-        if response.status_code == 200 and "noteDetailMap" not in response.text:
+        if response.status_code == 200 and not _has_note_payload(response.text):
             session.get(HOME_URL, timeout=20, allow_redirects=True)
             response = session.get(url, timeout=20, allow_redirects=True)
 

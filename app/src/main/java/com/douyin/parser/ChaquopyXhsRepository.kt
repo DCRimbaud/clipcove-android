@@ -42,7 +42,9 @@ class ChaquopyXhsRepository : XhsRepository {
                     ParseFailure(ParseFailureType.RESPONSE_CHANGED, "小红书返回了空白页面")
                 )
             }
-            XhsSsrParser.parse(html, url)
+            val finalUrl = envelope.optString("final_url").ifBlank { url }
+            Log.d(TAG, "XHS python page bytes=${html.length} finalUrl=${finalUrl.take(180)}")
+            XhsSsrParser.parse(html, finalUrl)
         } catch (e: Exception) {
             Log.e(TAG, "XHS Python fetch failed", e)
             ParseResult.Failure(

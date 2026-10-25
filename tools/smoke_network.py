@@ -59,7 +59,8 @@ def check_xiaohongshu() -> None:
     if envelope.get("error"):
         raise AssertionError(f"XHS failed: {envelope['error']}")
     page = envelope.get("html", "")
-    if "window.__INITIAL_STATE__" not in page or "noteDetailMap" not in page:
+    has_note_payload = "noteDetailMap" in page or ("noteData" in page and "noteId" in page)
+    if "window.__INITIAL_STATE__" not in page or not has_note_payload:
         raise AssertionError("XHS SSR note data is missing")
     note_id = re.search(r"/explore/([0-9a-f]{24})", note_url)
     print(f"[OK] Xiaohongshu SSR {note_id.group(1) if note_id else 'unknown'}")

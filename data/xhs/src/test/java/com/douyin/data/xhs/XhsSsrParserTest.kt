@@ -103,6 +103,135 @@ class XhsSsrParserTest {
     }
 
     @Test
+    fun `maps mobile noteData SSR payload`() {
+        val mobileNote = JSONObject()
+            .put("noteId", NOTE_ID)
+            .put("type", "video")
+            .put("title", "")
+            .put("desc", "#测试话题[话题]#")
+            .put("time", 1_792_861_419_000L)
+            .put("user", JSONObject().put("nickName", "移动端作者"))
+            .put(
+                "video",
+                JSONObject().put(
+                    "media",
+                    JSONObject().put(
+                        "stream",
+                        JSONObject().put(
+                            "h264",
+                            JSONArray().put(
+                                JSONObject()
+                                    .put("masterUrl", "https://example.com/mobile.mp4")
+                                    .put("avgBitrate", 2_133_809)
+                                    .put("duration", 23_104)
+                            )
+                        )
+                    )
+                )
+            )
+            .put(
+                "imageList",
+                JSONArray().put(JSONObject().put("url", "https://example.com/mobile-cover.jpg"))
+            )
+        val state = JSONObject().put(
+            "noteData",
+            JSONObject().put(
+                "data",
+                JSONObject().put("noteData", mobileNote)
+            )
+        )
+
+        val result = XhsSsrParser.parse(html(state), sourceUrl())
+
+        val media = (result as ParseResult.Success).media
+        assertEquals(NOTE_ID, media.id)
+        assertEquals("移动端作者", media.author)
+        assertEquals("https://example.com/mobile.mp4", media.videoUrl)
+        assertEquals("https://example.com/mobile-cover.jpg", media.coverUrl)
+    }
+
+    @Test
+    fun `selects the note matching the share url`() {
+        val wrongNote = JSONObject()
+            .put("noteId", "aaaaaaaaaaaaaaaaaaaaaaaa")
+            .put("title", "错误笔记")
+            .put("type", "normal")
+            .put("imageList", JSONArray().put(JSONObject().put("urlDefault", "https://example.com/wrong.jpg")))
+        val correctNote = JSONObject()
+            .put("noteId", NOTE_ID)
+            .put("title", "正确笔记")
+            .put("type", "normal")
+            .put("user", JSONObject().put("nickname", "正确作者"))
+            .put("imageList", JSONArray().put(JSONObject().put("urlDefault", "https://example.com/right.jpg")))
+
+        val noteMap = JSONObject()
+            .put("aaaaaaaaaaaaaaaaaaaaaaaa", JSONObject().put("note", wrongNote))
+            .put(NOTE_ID, JSONObject().put("note", correctNote))
+        val state = JSONObject().put(
+            "note",
+            JSONObject().put("noteDetailMap", noteMap).put("currentNoteId", "aaaaaaaaaaaaaaaaaaaaaaaa")
+        )
+
+        val result = XhsSsrParser.parse(html(state), sourceUrl())
+
+        val media = (result as ParseResult.Success).media
+        assertEquals(NOTE_ID, media.id)
+        assertEquals("正确笔记", media.title)
+        assertEquals("https://example.com/right.jpg", media.coverUrl)
+    }
+
+    @Test
+    fun `supports mediaV2 snake case video stream`() {
+        val mediaV2 = JSONObject().put(
+            "stream",
+            JSONObject().put(
+                "h264",
+                JSONArray().put(
+                    JSONObject()
+                        .put("master_url", "https://example.com/media-v2.mp4")
+                        .put("stream_desc", "X264_MP4")
+                        .put("avg_bitrate", 2_973_769)
+                        .put("duration", 23_104)
+                )
+            )
+        )
+        val note = JSONObject()
+            .put("noteId", NOTE_ID)
+            .put("title", "mediaV2 视频")
+            .put("type", "video")
+            .put("user", JSONObject().put("nickname", "作者"))
+            .put(
+                "video",
+                JSONObject()
+                    .put("media", JSONObject().put("stream", JSONObject().put("h264", JSONArray())))
+                    .put("mediaV2", mediaV2.toString())
+            )
+
+        val result = XhsSsrParser.parse(html(stateFor(note)), sourceUrl())
+
+        val media = (result as ParseResult.Success).media
+        assertEquals("https://example.com/media-v2.mp4", media.videoUrl)
+        assertEquals(23_104L, media.durationMs)
+        assertEquals(2_973_769L, media.videoCandidates.single().bitrate)
+    }
+
+    @Test
+    fun `rejects a video note without a playable stream`() {
+        val note = JSONObject()
+            .put("noteId", NOTE_ID)
+            .put("title", "无视频流")
+            .put("type", "video")
+            .put("video", JSONObject().put("media", JSONObject().put("stream", JSONObject())))
+            .put("imageList", JSONArray().put(JSONObject().put("urlDefault", "https://example.com/cover.jpg")))
+
+        val result = XhsSsrParser.parse(html(stateFor(note)), sourceUrl())
+
+        val failure = (result as ParseResult.Failure).error
+        assertEquals(ParseFailureType.RESPONSE_CHANGED, failure.type)
+        assertTrue(failure.message.contains("视频地址"))
+    }
+
+    @Test
     fun `reports changed page structure when state is absent`() {
         val result = XhsSsrParser.parse("<html><body>blocked</body></html>", sourceUrl())
 

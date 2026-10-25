@@ -21,26 +21,66 @@ object XhsSsrParser {
                 "小红书页面结构已变化，请确认使用最新分享链接",
                 "initial_state_missing bytes=${html.length}",
             )
-        val note = state.optJSONObject("note")
-            ?: return failure(
-                "小红书页面中没有笔记数据",
-                "note_missing topKeys=${state.keys().asSequence().take(16).joinToString(",")}",
-            )
-        val noteMap = note.optJSONObject("noteDetailMap")
-            ?: return failure(
-                "小红书页面中没有笔记数据",
-                "note_detail_map_missing noteKeys=${note.keys().asSequence().take(16).joinToString(",")}",
-            )
-        val key = noteMap.keys().asSequence().firstOrNull()
-            ?: return failure("小红书笔记数据为空", "note_detail_map_empty")
-        val detail = noteMap.optJSONObject(key)?.optJSONObject("note")
-            ?: return failure(
-                "小红书笔记详情格式已变化",
-                "note_detail_missing entryKeys=${noteMap.optJSONObject(key)?.keys()?.asSequence()?.take(16)?.joinToString(",")}",
-            )
 
+        val expectedId = noteIdFromUrl(sourceUrl)
+        val mobileNote = state.optJSONObject("noteData")
+            ?.optJSONObject("data")
+            ?.optJSONObject("noteData")
+        var mobileFailure: ParseResult.Failure? = null
+        if (mobileNote != null) {
+            val mobileId = mobileNote.optString("noteId")
+            val matchesExpected = expectedId == null || mobileId.isBlank() || mobileId == expectedId
+            if (matchesExpected) {
+                val result = parseNoteObject(
+                    detail = mobileNote,
+                    fallbackId = mobileId.ifBlank { expectedId.orEmpty() },
+                    sourceUrl = sourceUrl,
+                )
+                if (result is ParseResult.Success) return result
+                mobileFailure = result as ParseResult.Failure
+            }
+        }
+
+        val desktopNote = state.optJSONObject("note")
+        val noteMap = desktopNote?.optJSONObject("noteDetailMap")
+        if (desktopNote != null && noteMap != null && noteMap.length() > 0) {
+            val currentNoteId = desktopNote.optString("currentNoteId").takeIf { it.isNotBlank() }
+            val key = pickNoteKey(noteMap, expectedId, currentNoteId)
+            if (key != null) {
+                val detail = noteMap.optJSONObject(key)?.optJSONObject("note")
+                if (detail != null) {
+                    val result = parseNoteObject(detail, key, sourceUrl)
+                    if (result is ParseResult.Success) return result
+                    if (mobileFailure == null) mobileFailure = result as ParseResult.Failure
+                }
+            }
+        }
+
+        if (mobileFailure != null) return mobileFailure
+        return failure(
+            "小红书页面中没有笔记数据",
+            "expectedId=$expectedId topKeys=${state.keys().asSequence().take(24).joinToString(",")}",
+        )
+    }
+
+    private fun parseNoteObject(
+        detail: JSONObject,
+        fallbackId: String,
+        sourceUrl: String,
+    ): ParseResult {
         return try {
-            ParseResult.Success(normalize(detail, key, sourceUrl))
+            val media = normalize(detail, fallbackId, sourceUrl)
+            val isVideoNote = detail.optString("type").equals("video", ignoreCase = true)
+            if (isVideoNote && media.videoUrl.isBlank()) {
+                failure(
+                    "小红书视频地址解析失败，请稍后重试",
+                    "video_missing id=${media.id} images=${media.images.size} videoKeys=${detail.optJSONObject("video")?.keys()?.asSequence()?.joinToString(",")}",
+                )
+            } else if (!media.hasVideo && !media.hasImages) {
+                failure("小红书没有返回可下载的媒体", "empty_media id=${media.id} title=${media.title}")
+            } else {
+                ParseResult.Success(media)
+            }
         } catch (e: Exception) {
             ParseResult.Failure(
                 ParseFailure(
@@ -99,10 +139,14 @@ object XhsSsrParser {
     private fun normalize(note: JSONObject, fallbackId: String, sourceUrl: String): MediaInfo {
         val video = note.optJSONObject("video")
         val images = note.optJSONArray("imageList")
-        val streams = video?.optJSONObject("media")?.optJSONObject("stream")
+        val directStreams = video?.optJSONObject("media")?.optJSONObject("stream")
             ?: video?.optJSONObject("stream")
-        val h264Streams = streams?.optJSONArray("h264")
-        val candidates = h264Streams.toVideoCandidates()
+        var h264Streams = directStreams?.optJSONArray("h264")
+        var candidates = h264Streams.toVideoCandidates()
+        if (candidates.isEmpty()) {
+            h264Streams = mediaV2Streams(video)?.optJSONArray("h264")
+            candidates = h264Streams.toVideoCandidates()
+        }
         val videoUrl = candidates.firstOrNull()?.url.orEmpty()
         val firstImageUrl = images?.optJSONObject(0).bestImageUrl().orEmpty()
         val videoCover = video?.optJSONObject("cover")
@@ -120,7 +164,9 @@ object XhsSsrParser {
             title = note.optString("title").ifBlank {
                 note.optString("desc").lineSequence().firstOrNull().orEmpty()
             }.ifBlank { "(无标题)" },
-            author = note.optJSONObject("user")?.optString("nickname").orEmpty(),
+            author = note.optJSONObject("user")?.optString("nickname")
+                ?.ifBlank { note.optJSONObject("user")?.optString("nickName").orEmpty() }
+                .orEmpty(),
             coverUrl = videoCover.ifBlank { firstImageUrl },
             createdAtSeconds = if (rawTime > 1_000_000_000_000L) rawTime / 1000 else rawTime,
             durationMs = h264Streams.optDurationMs(video),
@@ -141,21 +187,54 @@ object XhsSsrParser {
         return buildList {
             for (index in 0 until length()) {
                 val item = optJSONObject(index) ?: continue
-                val url = item.optString("masterUrl").ifBlank {
-                    item.optJSONArray("backupUrls")?.optString(0).orEmpty()
-                }
+                val backupUrls = item.optJSONArray("backupUrls")
+                    ?: item.optJSONArray("backup_urls")
+                val url = item.optString("masterUrl")
+                    .ifBlank { item.optString("master_url") }
+                    .ifBlank { backupUrls?.optString(0).orEmpty() }
                 if (url.isBlank()) continue
+                val bitrate = sequenceOf(
+                    item.optLong("avgBitrate"),
+                    item.optLong("avg_bitrate"),
+                    item.optLong("videoBitrate"),
+                    item.optLong("video_bitrate"),
+                ).firstOrNull { it > 0 } ?: 0L
                 add(
                     VideoCandidate(
-                        label = item.optString("streamDesc", "h264_$index"),
+                        label = item.optString("streamDesc")
+                            .ifBlank { item.optString("stream_desc", "h264_$index") },
                         url = url,
-                        bitrate = item.optLong("avgBitrate", item.optLong("videoBitrate"))
-                            .coerceAtLeast(0),
+                        bitrate = bitrate,
                     )
                 )
             }
         }
     }
+
+    private fun mediaV2Streams(video: JSONObject?): JSONObject? {
+        if (video == null) return null
+        return when (val value = video.opt("mediaV2")) {
+            is JSONObject -> value.optJSONObject("stream")
+            is String -> runCatching { JSONObject(value).optJSONObject("stream") }.getOrNull()
+            else -> null
+        }
+    }
+
+    private fun pickNoteKey(
+        noteMap: JSONObject,
+        expectedId: String?,
+        currentNoteId: String?,
+    ): String? {
+        expectedId?.takeIf { noteMap.has(it) }?.let { return it }
+        currentNoteId?.takeIf { noteMap.has(it) }?.let { return it }
+        return if (noteMap.length() == 1) noteMap.keys().asSequence().firstOrNull() else null
+    }
+
+    private fun noteIdFromUrl(url: String): String? =
+        Regex("""(?:explore|discovery/item|item)/([a-f0-9]{24})""")
+            .find(url)
+            ?.groupValues
+            ?.getOrNull(1)
 
     private fun JSONArray?.toMediaImages(): List<MediaImage> {
         if (this == null) return emptyList()
