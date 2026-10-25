@@ -77,7 +77,7 @@ adb install -r app\build\outputs\apk\release\app-release.apk
 
 1. Confirm `CHANGELOG.md` uses the release version and date.
 2. Commit all source and documentation changes.
-3. Tag the exact commit: `git tag -a v1.1.0 -m "ClipCove v1.1.0"`.
+3. Tag the exact commit: `git tag -a v1.2.0 -m "ClipCove v1.2.0"`.
 4. Push the branch and tag.
 5. Create a GitHub prerelease or release with both the APK and `.sha256` checksum assets. In-app updates reject releases without these assets.
 6. Wait for Android CI to pass on the released commit.

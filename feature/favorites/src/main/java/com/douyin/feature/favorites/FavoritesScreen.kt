@@ -4,8 +4,15 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -45,6 +52,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.douyin.core.designsystem.DyMotion
+import com.douyin.core.designsystem.dyPressable
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.douyin.core.designsystem.DyBorder
@@ -127,28 +136,57 @@ fun FavoritesScreen(
                 ),
             )
             Spacer(Modifier.height(12.dp))
-            if (filteredItems.isEmpty()) {
-                DyEmptyState(
-                    icon = Icons.Filled.Search,
-                    title = "没有匹配的收藏",
-                    description = "换一个标题、作品 ID 或链接关键词试试。",
-                )
-            } else {
-                LazyColumn(
-                    modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(bottom = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    items(filteredItems, key = { it.awemeId }) { item ->
-                        FavoriteCard(
-                            item = item,
-                            onRemove = {
-                                repository.remove(item.awemeId)
-                                version++
-                            },
-                            onCopyLink = { copyFavoriteLink(context, item) },
-                            onClick = { onOpen(item) },
+            AnimatedContent(
+                targetState = filteredItems.isEmpty(),
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                transitionSpec = {
+                    (
+                        fadeIn(
+                            tween(
+                                DyMotion.StandardMs,
+                                easing = DyMotion.EmphasizedEasing,
+                            )
+                        ) + slideInVertically(
+                            animationSpec = tween(
+                                DyMotion.StandardMs,
+                                easing = DyMotion.EmphasizedEasing,
+                            ),
+                            initialOffsetY = { it / 18 },
                         )
+                    ).togetherWith(
+                        fadeOut(
+                            tween(
+                                DyMotion.QuickMs,
+                                easing = DyMotion.StandardEasing,
+                            )
+                        )
+                    ).using(SizeTransform(clip = false))
+                },
+                label = "favoritesContent",
+            ) { empty ->
+                if (empty) {
+                    DyEmptyState(
+                        icon = Icons.Filled.Search,
+                        title = "没有匹配的收藏",
+                        description = "换一个标题、作品 ID 或链接关键词试试。",
+                    )
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(bottom = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        items(filteredItems, key = { it.awemeId }) { item ->
+                            FavoriteCard(
+                                item = item,
+                                onRemove = {
+                                    repository.remove(item.awemeId)
+                                    version++
+                                },
+                                onCopyLink = { copyFavoriteLink(context, item) },
+                                onClick = { onOpen(item) },
+                            )
+                        }
                     }
                 }
             }
@@ -167,10 +205,19 @@ private fun FavoriteCard(
         item.awemeId.matches(Regex("""(?i)[a-f0-9]{24}"""))
     val platformColor = if (isXhs) DyRed else DyCyan
     Surface(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize(
+                animationSpec = tween(
+                    DyMotion.StandardMs,
+                    easing = DyMotion.StandardEasing,
+                )
+            )
+            .dyPressable(pressedScale = 0.985f, onClick = onClick),
         shape = RoundedCornerShape(20.dp),
         color = DyCard,
         border = BorderStroke(1.dp, DyBorder.copy(alpha = 0.68f)),
+        shadowElevation = 2.dp,
     ) {
         Row(
             modifier = Modifier.padding(10.dp),

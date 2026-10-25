@@ -67,14 +67,26 @@ TTWID_PAYLOAD = {
 }
 
 
-def original_image_url(url: str) -> str:
-    """去掉 CDN 压缩参数(~tplv-xxx),取原图地址。"""
-    if not url:
+def best_image_url(url_list: list[str]) -> str:
+    """选择平台提供且可直接下载的图片直链。
+
+    签名的 ``~tplv-...`` 路径不能简单去掉再请求：CDN 会把去掉路径后的
+    URL 当成另一个对象并返回 403。``url_list`` 里的 JPEG 版本仍然是
+    平台渲染图（不是带作者水印的 ``download_url_list``），优先选择它，
+    这样文件扩展名和响应内容也更一致。
+    """
+    urls = [url for url in url_list if url]
+    if not urls:
         return ""
-    path, _, query = url.partition("?")
-    if "~tplv-" in path:
-        path = path.split("~tplv-")[0]
-    return path + ("?" + query if query else "")
+    return next(
+        (
+            url
+            for url in urls
+            if ".jpeg" in url.split("?", 1)[0].lower()
+            or ".jpg" in url.split("?", 1)[0].lower()
+        ),
+        urls[0],
+    )
 
 
 def gen_verify_fp() -> str:
@@ -228,9 +240,12 @@ class DouyinClient:
         if images:
             image_items = []
             for img in images:
+                url = best_image_url(img.get("url_list") or [])
                 item = {
-                    "url": (img.get("url_list") or [""])[0],
-                    "original_url": original_image_url((img.get("url_list") or [""])[0]),
+                    "url": url,
+                    # 保留字段以兼容旧版 JSON 消费方；该值由客户端自行选择，
+                    # 不能通过删除 CDN 签名路径来伪造。
+                    "original_url": "",
                     "gif_url": "",
                     "width": img.get("width"),
                     "height": img.get("height"),

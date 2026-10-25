@@ -9,8 +9,20 @@ import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import android.widget.Toast
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -47,6 +59,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -61,6 +74,7 @@ import com.douyin.core.designsystem.DyCyan
 import com.douyin.core.designsystem.DyEmptyState
 import com.douyin.core.designsystem.DyGreen
 import com.douyin.core.designsystem.DyIconTile
+import com.douyin.core.designsystem.DyMotion
 import com.douyin.core.designsystem.DyInput
 import com.douyin.core.designsystem.DyPageHeader
 import com.douyin.core.designsystem.DyPanel
@@ -68,6 +82,7 @@ import com.douyin.core.designsystem.DyPill
 import com.douyin.core.designsystem.DyRed
 import com.douyin.core.designsystem.DyText
 import com.douyin.core.designsystem.DyTextSecondary
+import com.douyin.core.designsystem.dyPressable
 import com.douyin.data.download.DownloadRepository
 import com.douyin.data.download.DownloadStatus
 import com.douyin.data.download.DownloadTask
@@ -158,31 +173,78 @@ fun DownloadsScreen(repository: DownloadRepository) {
                     )
                 }
             }
-            if (completedCount > 0 && filter == DownloadFilter.DONE) {
-                Spacer(Modifier.height(4.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    TextButton(onClick = { confirmClearCompleted = true }) {
-                        Text("清理已完成", color = DyRed, fontSize = 12.sp)
+            AnimatedVisibility(
+                visible = completedCount > 0 && filter == DownloadFilter.DONE,
+                enter = fadeIn(tween(DyMotion.StandardMs, easing = DyMotion.StandardEasing)) +
+                    expandVertically(
+                        animationSpec = tween(
+                            DyMotion.StandardMs,
+                            easing = DyMotion.StandardEasing,
+                        )
+                    ),
+                exit = fadeOut(tween(DyMotion.QuickMs, easing = DyMotion.StandardEasing)) +
+                    shrinkVertically(
+                        animationSpec = tween(
+                            DyMotion.QuickMs,
+                            easing = DyMotion.StandardEasing,
+                        )
+                    ),
+            ) {
+                Column {
+                    Spacer(Modifier.height(4.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        TextButton(onClick = { confirmClearCompleted = true }) {
+                            Text("清理已完成", color = DyRed, fontSize = 12.sp)
+                        }
                     }
                 }
             }
             Spacer(Modifier.height(10.dp))
-            if (filteredTasks.isEmpty()) {
-                DyPanel(contentPadding = 16.dp) {
-                    Text(
-                        if (query.isBlank()) "当前分类没有下载任务" else "没有匹配“$query”的下载任务",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = DyTextSecondary,
-                    )
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(bottom = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    items(filteredTasks, key = { it.id }) { task ->
-                        DownloadCard(task = task, repository = repository)
+            AnimatedContent(
+                targetState = filteredTasks.isEmpty(),
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                transitionSpec = {
+                    (
+                        fadeIn(
+                            tween(
+                                DyMotion.StandardMs,
+                                easing = DyMotion.EmphasizedEasing,
+                            )
+                        ) + slideInVertically(
+                            animationSpec = tween(
+                                DyMotion.StandardMs,
+                                easing = DyMotion.EmphasizedEasing,
+                            ),
+                            initialOffsetY = { it / 24 },
+                        )
+                    ).togetherWith(
+                        fadeOut(
+                            tween(
+                                DyMotion.QuickMs,
+                                easing = DyMotion.StandardEasing,
+                            )
+                        )
+                    ).using(SizeTransform(clip = false))
+                },
+                label = "downloadContent",
+            ) { empty ->
+                if (empty) {
+                    DyPanel(contentPadding = 16.dp) {
+                        Text(
+                            if (query.isBlank()) "当前分类没有下载任务" else "没有匹配“$query”的下载任务",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = DyTextSecondary,
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(bottom = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        items(filteredTasks, key = { it.id }) { task ->
+                            DownloadCard(task = task, repository = repository)
+                        }
                     }
                 }
             }
@@ -225,17 +287,42 @@ private fun FilterChip(
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
+    val containerColor by animateColorAsState(
+        targetValue = if (selected) DyCyan.copy(alpha = 0.15f) else DyInput,
+        animationSpec = tween(DyMotion.StandardMs, easing = DyMotion.StandardEasing),
+        label = "downloadFilterColor",
+    )
+    val borderColor by animateColorAsState(
+        targetValue = if (selected) DyCyan.copy(alpha = 0.65f) else DyBorder,
+        animationSpec = tween(DyMotion.StandardMs, easing = DyMotion.StandardEasing),
+        label = "downloadFilterBorder",
+    )
+    val labelColor by animateColorAsState(
+        targetValue = if (selected) DyCyan else DyTextSecondary,
+        animationSpec = tween(DyMotion.QuickMs, easing = DyMotion.StandardEasing),
+        label = "downloadFilterLabel",
+    )
+    val scale by animateFloatAsState(
+        targetValue = if (selected) 1.02f else 1f,
+        animationSpec = tween(DyMotion.StandardMs, easing = DyMotion.StandardEasing),
+        label = "downloadFilterScale",
+    )
     Surface(
-        modifier = modifier.clickable(onClick = onClick),
+        modifier = modifier
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .dyPressable(pressedScale = 0.96f, onClick = onClick),
         shape = RoundedCornerShape(12.dp),
-        color = if (selected) DyCyan.copy(alpha = 0.15f) else DyInput,
-        border = BorderStroke(1.dp, if (selected) DyCyan.copy(alpha = 0.65f) else DyBorder),
+        color = containerColor,
+        border = BorderStroke(1.dp, borderColor),
     ) {
         Text(
             label,
             modifier = Modifier.padding(horizontal = 6.dp, vertical = 8.dp),
             style = MaterialTheme.typography.bodySmall,
-            color = if (selected) DyCyan else DyTextSecondary,
+            color = labelColor,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -253,12 +340,29 @@ private fun SummaryMetric(label: String, value: String, color: Color, modifier: 
 @Composable
 private fun DownloadCard(task: DownloadTask, repository: DownloadRepository) {
     val context = LocalContext.current
-    val statusColor = task.status.statusColor()
+    val statusColor by animateColorAsState(
+        targetValue = task.status.statusColor(),
+        animationSpec = tween(DyMotion.StandardMs, easing = DyMotion.StandardEasing),
+        label = "downloadStatusColor",
+    )
+    val animatedProgress by animateFloatAsState(
+        targetValue = (task.progress / 100f).coerceIn(0f, 1f),
+        animationSpec = tween(DyMotion.StandardMs, easing = DyMotion.StandardEasing),
+        label = "downloadProgress",
+    )
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize(
+                animationSpec = tween(
+                    DyMotion.StandardMs,
+                    easing = DyMotion.StandardEasing,
+                )
+            ),
         shape = RoundedCornerShape(20.dp),
         color = DyCard,
         border = BorderStroke(1.dp, DyBorder.copy(alpha = 0.68f)),
+        shadowElevation = 2.dp,
     ) {
         Column(Modifier.padding(14.dp)) {
             Row(
@@ -275,7 +379,7 @@ private fun DownloadCard(task: DownloadTask, repository: DownloadRepository) {
             }
             Spacer(Modifier.height(12.dp))
             LinearProgressIndicator(
-                progress = { (task.progress / 100f).coerceIn(0f, 1f) },
+                progress = { animatedProgress },
                 modifier = Modifier.fillMaxWidth().height(5.dp).clip(RoundedCornerShape(50)),
                 color = statusColor,
                 trackColor = DyInput,

@@ -1,15 +1,17 @@
 package com.douyin.feature.home
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -49,7 +51,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -58,6 +62,7 @@ import com.douyin.core.designsystem.DyBorder
 import com.douyin.core.designsystem.DyCard
 import com.douyin.core.designsystem.DyCyan
 import com.douyin.core.designsystem.DyIconTile
+import com.douyin.core.designsystem.DyMotion
 import com.douyin.core.designsystem.DyInput
 import com.douyin.core.designsystem.DyPageHeader
 import com.douyin.core.designsystem.DyPanel
@@ -68,6 +73,7 @@ import com.douyin.core.designsystem.DySurfaceHigh
 import com.douyin.core.designsystem.DyText
 import com.douyin.core.designsystem.DyTextSecondary
 import com.douyin.core.designsystem.DyTextTertiary
+import com.douyin.core.designsystem.dyPressable
 import com.douyin.core.model.MediaImage
 import com.douyin.core.model.MediaInfo
 import com.douyin.core.model.ParseFailure
@@ -111,36 +117,45 @@ fun HomeScreen(
                     loading = loading,
                 )
             }
-            if (loading) {
-                item {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        LinearProgressIndicator(
-                            modifier = Modifier.fillMaxWidth().height(2.dp),
-                            color = DyRed,
-                            trackColor = DyBorder.copy(alpha = 0.55f),
-                        )
-                        Text(
-                            "正在连接平台并提取原始媒体…",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = DyTextSecondary,
-                        )
-                    }
-                }
-            }
-            if (error != null) {
-                item { ErrorPanel(error = error, onRetry = onParse) }
-            }
-            if (result != null) {
-                item {
-                    AnimatedVisibility(
-                        visible = true,
-                        enter = fadeIn(tween(320)) + slideInVertically(
-                            animationSpec = tween(320),
-                            initialOffsetY = { it / 10 },
-                        ),
-                    ) {
-                        ResultCard(
-                            media = result,
+            item {
+                AnimatedContent(
+                    targetState = when {
+                        loading -> ParseContentState.Loading
+                        error != null -> ParseContentState.Failed(error)
+                        result != null -> ParseContentState.Success(result)
+                        else -> ParseContentState.Idle
+                    },
+                    transitionSpec = {
+                        (
+                            fadeIn(
+                                tween(
+                                    durationMillis = DyMotion.StandardMs,
+                                    easing = DyMotion.EmphasizedEasing,
+                                )
+                            ) + slideInVertically(
+                                animationSpec = tween(
+                                    durationMillis = DyMotion.StandardMs,
+                                    easing = DyMotion.EmphasizedEasing,
+                                ),
+                                initialOffsetY = { it / 18 },
+                            )
+                        ).togetherWith(
+                            fadeOut(
+                                tween(
+                                    durationMillis = DyMotion.QuickMs,
+                                    easing = DyMotion.StandardEasing,
+                                )
+                            )
+                        ).using(SizeTransform(clip = false))
+                    },
+                    label = "parseContent",
+                ) { state ->
+                    when (state) {
+                        ParseContentState.Idle -> Spacer(Modifier.height(0.dp))
+                        ParseContentState.Loading -> LoadingPanel()
+                        is ParseContentState.Failed -> ErrorPanel(state.error, onParse)
+                        is ParseContentState.Success -> ResultCard(
+                            media = state.media,
                             onDownload = onDownload,
                             onDownloadGallery = onDownloadGallery,
                             onMerge = onMerge,
@@ -190,10 +205,15 @@ fun HomeScreen(
             visible = clipboardSuggestion != null,
             modifier = Modifier.align(Alignment.BottomCenter),
             enter = slideInVertically(
-                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+                animationSpec = tween(
+                    durationMillis = DyMotion.StandardMs,
+                    easing = DyMotion.EmphasizedEasing,
+                ),
                 initialOffsetY = { it },
-            ) + fadeIn(tween(180)),
-            exit = slideOutVertically(tween(160)) { it } + fadeOut(tween(160)),
+            ) + fadeIn(tween(DyMotion.StandardMs, easing = DyMotion.StandardEasing)),
+            exit = slideOutVertically(
+                tween(DyMotion.QuickMs, easing = DyMotion.StandardEasing)
+            ) { it } + fadeOut(tween(DyMotion.QuickMs, easing = DyMotion.StandardEasing)),
         ) {
             clipboardSuggestion?.let { link ->
                 ClipboardSuggestion(
@@ -208,26 +228,85 @@ fun HomeScreen(
 
 @Composable
 private fun HomeHeader() {
+    val compact = LocalConfiguration.current.screenWidthDp < 400
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Box(
-            modifier = Modifier
-                .size(52.dp)
-                .clip(RoundedCornerShape(17.dp))
-                .background(Brush.linearGradient(listOf(DyRed, Color(0xFFFF7A5C)))),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text("C", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+        Box(modifier = Modifier.size(68.dp), contentAlignment = Alignment.Center) {
+            Box(
+                modifier = Modifier
+                    .size(68.dp)
+                    .background(
+                        Brush.radialGradient(
+                            colors = listOf(DyRed.copy(alpha = 0.22f), Color.Transparent),
+                        ),
+                        CircleShape,
+                    ),
+            )
+            Box(
+                modifier = Modifier
+                    .size(52.dp)
+                    .clip(RoundedCornerShape(17.dp))
+                    .background(
+                        Brush.linearGradient(
+                            listOf(DyRed, Color(0xFFFF7A5C), Color(0xFFFF9A62)),
+                        )
+                    )
+                    .border(1.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(17.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("C", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+            }
         }
         DyPageHeader(
             title = "ClipCove",
             subtitle = "Keep what you love. Locally.",
-            eyebrow = "LOCAL MEDIA · PRIVATE BY DEFAULT",
+            eyebrow = "LOCAL MEDIA · PRIVATE",
             modifier = Modifier.weight(1f),
-            trailing = { DyPill(text = "本地解析", color = DyCyan) },
+            trailing = if (compact) {
+                null
+            } else {
+                { DyPill(text = "本地解析", color = DyCyan) }
+            },
+        )
+    }
+}
+
+private sealed interface ParseContentState {
+    data object Idle : ParseContentState
+    data object Loading : ParseContentState
+    data class Failed(val error: ParseFailure) : ParseContentState
+    data class Success(val media: MediaInfo) : ParseContentState
+}
+
+@Composable
+private fun LoadingPanel() {
+    DyPanel(contentPadding = 14.dp) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(20.dp),
+                strokeWidth = 2.dp,
+                color = DyRed,
+            )
+            Column(Modifier.weight(1f)) {
+                Text("正在解析", style = MaterialTheme.typography.titleMedium, color = DyText)
+                Text(
+                    "连接平台并提取原始媒体，请稍候…",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = DyTextSecondary,
+                )
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        LinearProgressIndicator(
+            modifier = Modifier.fillMaxWidth().height(2.dp),
+            color = DyRed,
+            trackColor = DyBorder.copy(alpha = 0.55f),
         )
     }
 }

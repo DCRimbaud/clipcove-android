@@ -1,9 +1,13 @@
 package com.douyin.core.designsystem
 
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -21,6 +25,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -28,6 +35,40 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+
+@Composable
+fun DyAmbientBackground(
+    modifier: Modifier = Modifier,
+    content: @Composable BoxScope.() -> Unit,
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .drawBehind {
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(DyBgGlow, DyBg, DyBg),
+                        endY = size.height * 0.58f,
+                    )
+                )
+                drawRect(
+                    brush = Brush.radialGradient(
+                        colors = listOf(DyRed.copy(alpha = 0.085f), Color.Transparent),
+                        center = Offset(size.width * 0.12f, size.height * 0.03f),
+                        radius = size.maxDimension * 0.72f,
+                    )
+                )
+                drawRect(
+                    brush = Brush.radialGradient(
+                        colors = listOf(DyCyan.copy(alpha = 0.045f), Color.Transparent),
+                        center = Offset(size.width * 0.96f, size.height * 0.26f),
+                        radius = size.maxDimension * 0.62f,
+                    )
+                )
+            },
+        content = content,
+    )
+}
 
 @Composable
 fun DyPageHeader(
@@ -44,13 +85,26 @@ fun DyPageHeader(
     ) {
         Column(Modifier.weight(1f)) {
             if (!eyebrow.isNullOrBlank()) {
-                Text(
-                    eyebrow.uppercase(),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = DyRed,
-                    letterSpacing = 1.2.sp,
-                )
-                Spacer(Modifier.height(5.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        Modifier
+                            .size(width = 18.dp, height = 2.dp)
+                            .background(
+                                Brush.horizontalGradient(listOf(DyRed, DyCyan)),
+                                RoundedCornerShape(50),
+                            )
+                    )
+                    Spacer(Modifier.size(7.dp))
+                    Text(
+                        eyebrow.uppercase(),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = DyRed,
+                        letterSpacing = 1.2.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Spacer(Modifier.height(7.dp))
             }
             Text(
                 title,
@@ -87,7 +141,18 @@ fun DySectionHeader(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, color = DyText)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier
+                        .size(width = 3.dp, height = 14.dp)
+                        .background(
+                            Brush.verticalGradient(listOf(DyRed, DyRed.copy(alpha = 0.25f))),
+                            RoundedCornerShape(50),
+                        )
+                )
+                Spacer(Modifier.size(7.dp))
+                Text(title, style = MaterialTheme.typography.titleMedium, color = DyText)
+            }
             if (!subtitle.isNullOrBlank()) {
                 Spacer(Modifier.height(2.dp))
                 Text(subtitle, style = MaterialTheme.typography.bodySmall, color = DyTextSecondary)
@@ -105,11 +170,18 @@ fun DyPanel(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Surface(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .animateContentSize(
+                animationSpec = tween(
+                    durationMillis = DyMotion.StandardMs,
+                    easing = DyMotion.StandardEasing,
+                )
+            ),
         shape = RoundedCornerShape(22.dp),
         color = color,
         border = BorderStroke(1.dp, DyBorder.copy(alpha = 0.72f)),
-        shadowElevation = 0.dp,
+        shadowElevation = 4.dp,
     ) {
         Column(Modifier.padding(contentPadding), content = content)
     }
@@ -149,7 +221,13 @@ fun DyIconTile(
     Box(
         modifier = modifier
             .size(size)
-            .background(tint.copy(alpha = 0.13f), CircleShape),
+            .background(
+                Brush.linearGradient(
+                    listOf(tint.copy(alpha = 0.20f), tint.copy(alpha = 0.06f)),
+                ),
+                CircleShape,
+            )
+            .border(1.dp, tint.copy(alpha = 0.18f), CircleShape),
         contentAlignment = Alignment.Center,
     ) {
         Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(size * 0.46f))
