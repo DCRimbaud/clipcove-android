@@ -1,86 +1,122 @@
-# 拾刻(ShiKe)
+# 拾刻 ShiKe
 
-多平台无水印解析安卓 App:支持 **抖音 + 小红书**,不依赖任何服务器,安装即用。
+[![Android CI](https://github.com/DCRimbaud/shike-android/actions/workflows/android-ci.yml/badge.svg)](https://github.com/DCRimbaud/shike-android/actions/workflows/android-ci.yml)
+[![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
+[![Latest release](https://img.shields.io/github/v/release/DCRimbaud/shike-android?include_prereleases)](https://github.com/DCRimbaud/shike-android/releases)
+
+拾刻是一款本地运行的 Android 媒体工具，支持解析抖音和小红书分享链接，并下载公开内容中的视频、图集、原声和动图。解析过程不依赖自建服务器，收藏、历史、下载任务均保存在本机。
+
+> 本项目与抖音、字节跳动、小红书无任何隶属关系。请仅处理你有权保存的内容，并遵守所在地区法律及平台规则。
 
 ## 功能
 
-- 多平台:抖音 / 小红书(分享口令、短链、完整链接、分享文案自动识别)
-- 无水印视频 / 音乐 / 图集图片 / 动图下载
-- 动图 + 音乐合成(ffmpeg-kit)
-- 图集原图下载(去 CDN 压缩)
-- 内置下载管理器(进度 / 打开 / 分享 / 另存 / 删除)
-- 收藏夹(独立 tab)
-- 系统分享一键解析、剪贴板快捷解析卡片
-- WiFi 传文件到电脑(局域网 HTTP,带 token 鉴权)
-- 自动保存到下载目录、导出备份
-- 解析历史(本地持久化,存原始链接,点击可重新解析)
-- 匿名解析,无需登录/配置(解析频繁可能触发风控,属平台限制)
+- 抖音、小红书分享口令、短链、完整链接和分享文案识别
+- 视频、图集原图、原声和 Live Photo / 动图下载
+- 断点续传、暂停、继续、失败重试和前台下载通知
+- 动图与原声合成
+- 本地收藏、解析历史和 JSON 备份
+- 剪贴板快捷解析和系统分享入口
+- WiFi 局域网传文件
+- 深色 Compose UI，支持 Android 7.0+（minSdk 24）
 
-## 架构(多模块,依赖单向)
+## 技术栈
 
+- Kotlin、Jetpack Compose、Material 3
+- ViewModel、StateFlow、Koin
+- OkHttp、Coil、Media3
+- Chaquopy + Python 3.12
+- ffmpeg-kit
+- 多模块 Android Gradle 项目
+
+## 架构
+
+```text
+app/                   应用壳、导航、依赖注入、平台适配器
+core/
+  model/               媒体模型与解析结果
+  designsystem/        主题与通用 Compose 组件
+  common/              通用工具
+data/
+  douyin/              抖音解析端口与 JSON 映射
+  xhs/                 小红书解析端口与 SSR 映射
+  download/            下载任务状态机
+  history/             历史记录
+  favorites/           收藏
+  merger/              FFmpeg 合成端口
+  transfer/            WiFi 传输
+  settings/            设置
+feature/
+  home/                首页、解析结果、历史
+  downloads/           下载管理
+  favorites/           收藏
+  settings/            设置
 ```
-douyin-app/
-├── gradle/libs.versions.toml      # 版本目录(单一依赖版本源)
-├── app/                           # 壳:Koin DI 装配 + 导航(唯一知道实现的地方)
-├── core/
-│   ├── model/                     # 强类型媒体模型 / 解析结果 / 错误分类
-│   ├── designsystem/              # 主题 / 颜色 / 通用 UI
-│   └── common/                    # 通用工具
-├── data/
-│   ├── douyin/                    # DouyinRepository 接口(Python 引擎解析)
-│   ├── xhs/                       # XhsRepository + 小红书 SSR 映射
-│   ├── download/                  # DownloadRepository(StateFlow 任务流)
-│   ├── history/                   # HistoryRepository(解析历史)
-│   ├── favorites/                 # FavoritesRepository(收藏)
-│   ├── merger/                    # VideoMerger 接口(ffmpeg 合成)
-│   ├── transfer/                  # WifiTransferServer(局域网传输)
-│   └── settings/                  # SettingsRepository(配置)
-└── feature/
-    ├── home/                      # 首页(多平台路由 / 结果卡片 / 历史 / 剪贴板弹窗)
-    ├── downloads/                 # 下载管理页
-    ├── favorites/                 # 收藏页
-    └── settings/                  # 设置页
-```
 
-- 依赖方向:`feature → core:model + data 接口 → app 装配`,无反向依赖
-- 平台解析统一返回 `ParseResult`，平台 JSON 只在 data 层映射
-- 增删平台 = 增 data 模块 + 解析路由;换实现只改 app 装配
-- 状态管理:ViewModel + StateFlow;图片:Coil(按域名 Referer);播放:Media3 ExoPlayer;DI:Koin
+依赖方向为 `feature → core:model + data 接口 → app 装配`。平台原始 JSON 只允许存在于 data 映射层，页面只接收强类型 `MediaInfo` 与 `ParseFailure`。
 
-## 版本规则
+## 构建
 
-- 测试版:`0.x.x`(功能 +0.1,修复 +0.0.1)
-- 正式版:`1.0.0` 起步,之后永远 1.x(功能 1.1.0 / 修复 1.0.1)
-- 改版本:`app/build.gradle.kts` 顶部三个数字
+### 环境要求
 
-## 构建(命令行,无需 Android Studio)
+- JDK 17
+- Android SDK 34（compileSdk 34，targetSdk 34）
+- Python 3.12 与 `pip`
+- Windows、macOS 或 Linux
+
+Chaquopy 需要找到本机 Python 可执行文件。优先读取环境变量 `PYTHON_EXE`；未设置时默认调用 PATH 中的 `python`。
+
+### Windows
 
 ```powershell
-$env:JAVA_HOME = "C:\Users\Admin\AppData\Local\Programs\jdk-17\jdk-17.0.2"
+$env:JAVA_HOME = "C:\path\to\jdk-17"
 $env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
-.\gradlew.bat assembleDebug
+$env:PYTHON_EXE = "C:\path\to\python.exe"
+
+# 首次构建前创建 local.properties，并替换为自己的 SDK 路径
+Set-Content local.properties 'sdk.dir=C\:\\Android'
+
+.\gradlew.bat lintDebug testDebugUnitTest assembleDebug
 ```
 
-产物:`app\build\outputs\apk\debug\app-debug.apk`(Python 路径可用环境变量 `PYTHON_EXE` 覆盖)
+### macOS / Linux
 
-## 开发验证
+```bash
+export JAVA_HOME=/path/to/jdk-17
+export PATH="$JAVA_HOME/bin:$PATH"
+export PYTHON_EXE=python3
+echo "sdk.dir=$ANDROID_HOME" > local.properties
+./gradlew lintDebug testDebugUnitTest assembleDebug
+```
+
+Debug APK 输出到 `app/build/outputs/apk/debug/app-debug.apk`。
+
+## 测试
 
 ```powershell
 .\gradlew.bat lintDebug testDebugUnitTest assembleDebug
 python tools\smoke_network.py
 ```
 
-`smoke_network.py` 会访问真实平台，可能受网络、风控或作品时效影响，不属于普通 CI。
+`tools/smoke_network.py` 会访问真实平台，用于手动冒烟测试。平台风控、网络环境或作品时效都可能导致失败，因此不进入普通 CI。
 
-## 安装
+## 已知限制
 
-- `adb install app-debug.apk`(小米需在开发者选项开启「USB 安装」)
-- 或拷到手机点击安装(允许未知来源)
+- 抖音和小红书接口、风控与页面结构会变化，解析器需要持续维护。
+- 小红书的 `xsec_token` 具有时效性，旧链接失效后必须重新复制分享链接。
+- 匿名解析可能触发频率限制或验证码。
+- 当前发布流程使用 Debug 签名；正式分发前应配置自己的 Release keystore。
+- 不提供账号登录、批量爬取、商业采集或代理池能力。
 
-## 说明
+## 安全与合规
 
-- 抖音解析引擎:Chaquopy 内嵌 Python(a_bogus 签名),代码在 `app/src/main/python/`
-- 小红书抓取:Chaquopy Python 获取官方 SSR 页面,Kotlin 负责类型映射与结构校验
-- 小红书解析:直接抓取笔记页 SSR 数据(点赞/评论/收藏/时间齐全),第三方 API 作备源
-- 小红书分享链接带时效(xsec_token 约 24h),过期后需重新复制分享链接
-- 仅个人学习使用,注意版权合规
+- 不要在 Issue、日志或截图中公开 Cookie、`xsec_token`、手机号、局域网地址等敏感信息。
+- 安全问题的报告方式见 [SECURITY.md](SECURITY.md)。
+- 本项目仅用于个人学习和研究。使用者应自行承担内容版权、平台条款和当地法律风险。
+
+## 参与贡献
+
+欢迎提交 Bug、兼容性修复和测试样本。提交前请阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。
+
+## 许可证
+
+本项目以 **GNU General Public License v3.0** 发布，详见 [LICENSE](LICENSE)。第三方代码与依赖归属见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。

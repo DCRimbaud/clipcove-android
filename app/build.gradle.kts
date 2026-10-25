@@ -56,7 +56,7 @@ chaquopy {
     defaultConfig {
         version = "3.12"
         // 鍙敤鐜鍙橀噺 PYTHON_EXE 瑕嗙洊(榛樿鏈満璺緞)
-        buildPython(System.getenv("PYTHON_EXE") ?: "C:/Users/Admin/AppData/Local/Programs/Python/Python312/python.exe")
+        buildPython(System.getenv("PYTHON_EXE") ?: "python")
         pip {
             install("requests==2.32.3")
             install("gmssl==3.2.2")

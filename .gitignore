@@ -1,10 +1,32 @@
+# Gradle / Android
 .gradle/
-build/
+**/build/
 local.properties
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+*.jks
+*.keystore
+keystore.properties
+secrets.properties
+
+# IDE / OS
 .idea/
 *.iml
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Python
 __pycache__/
-build_out.log
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
 
-build_rel.log
-
+# Logs and local scratch
+*.log
+outputs/
+work/
