@@ -105,6 +105,44 @@ class XhsSsrParserTest {
     }
 
     @Test
+    fun `upgrades insecure CDN URLs to HTTPS`() {
+        val note = JSONObject()
+            .put("noteId", NOTE_ID)
+            .put("title", "HTTPS")
+            .put("type", "video")
+            .put(
+                "video",
+                JSONObject().put(
+                    "media",
+                    JSONObject().put(
+                        "stream",
+                        JSONObject().put(
+                            "h264",
+                            JSONArray().put(
+                                JSONObject()
+                                    .put("masterUrl", "http://example.com/video.mp4")
+                            )
+                        )
+                    )
+                )
+            )
+            .put(
+                "imageList",
+                JSONArray().put(
+                    JSONObject()
+                        .put("urlDefault", "http://example.com/cover.jpg")
+                        .put("originalImageUrl", "http://example.com/original.jpg")
+                )
+            )
+
+        val media = (XhsSsrParser.parse(html(stateFor(note)), sourceUrl()) as ParseResult.Success).media
+
+        assertEquals("https://example.com/video.mp4", media.videoUrl)
+        assertEquals("https://example.com/cover.jpg", media.coverUrl)
+        assertEquals("https://example.com/original.jpg", media.images.single().preferredUrl)
+    }
+
+    @Test
     fun `prefers origin video over watermarked stream`() {
         val note = JSONObject()
             .put("noteId", NOTE_ID)

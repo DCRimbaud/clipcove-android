@@ -64,6 +64,30 @@ class DouyinMediaMapperTest {
     }
 
     @Test
+    fun `upgrades insecure platform URLs to HTTPS`() {
+        val result = DouyinMediaMapper.fromPythonJson(
+            """
+            {
+              "aweme_id":"7345492945006595379",
+              "title":"HTTPS",
+              "cover":"http://example.com/cover.jpg",
+              "play_url":"http://example.com/video.mp4",
+              "play_urls":[{"label":"best","url":"http://example.com/video.mp4"}],
+              "music":"http://example.com/music.mp3",
+              "images":[{"url":"http://example.com/image.jpg"}]
+            }
+            """.trimIndent()
+        )
+
+        val media = (result as ParseResult.Success).media
+        assertEquals("https://example.com/cover.jpg", media.coverUrl)
+        assertEquals("https://example.com/video.mp4", media.videoUrl)
+        assertEquals("https://example.com/video.mp4", media.videoCandidates.single().url)
+        assertEquals("https://example.com/music.mp3", media.musicUrl)
+        assertEquals("https://example.com/image.jpg", media.images.single().url)
+    }
+
+    @Test
     fun `maps image note and live photo`() {
         val result = DouyinMediaMapper.fromPythonJson(
             """

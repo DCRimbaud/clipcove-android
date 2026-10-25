@@ -37,7 +37,7 @@ object DouyinMediaMapper {
             )
         }
 
-        val declaredVideoUrl = root.optString("play_url")
+        val declaredVideoUrl = secureUrl(root.optString("play_url"))
         val candidates = root.optJSONArray("play_urls").toVideoCandidates().toMutableList()
         val videoUrl = declaredVideoUrl
             .ifBlank { candidates.firstOrNull()?.url.orEmpty() }
@@ -64,7 +64,7 @@ object DouyinMediaMapper {
             platform = MediaPlatform.DOUYIN,
             title = root.optString("title").ifBlank { "(无标题)" },
             author = root.optString("author"),
-            coverUrl = root.optString("cover"),
+            coverUrl = secureUrl(root.optString("cover")),
             createdAtSeconds = root.optLong("create_time").coerceAtLeast(0),
             durationMs = root.optLong("duration").coerceAtLeast(0),
             stats = MediaStats(
@@ -75,7 +75,7 @@ object DouyinMediaMapper {
             ),
             videoUrl = videoUrl,
             videoCandidates = candidates,
-            musicUrl = root.optString("music"),
+            musicUrl = secureUrl(root.optString("music")),
             musicTitle = root.optString("music_title"),
             images = images,
         )
@@ -125,7 +125,7 @@ object DouyinMediaMapper {
         return buildList {
             for (index in 0 until length()) {
                 val item = optJSONObject(index) ?: continue
-                val url = item.optString("url")
+                val url = secureUrl(item.optString("url"))
                 if (url.isBlank()) continue
                 add(
                     VideoCandidate(
@@ -150,13 +150,13 @@ object DouyinMediaMapper {
         return buildList {
             for (index in 0 until length()) {
                 val item = optJSONObject(index) ?: continue
-                val url = item.optString("url")
+                val url = secureUrl(item.optString("url"))
                 if (url.isBlank()) continue
                 add(
                     MediaImage(
                         url = url,
-                        originalUrl = item.optString("original_url"),
-                        livePhotoUrl = item.optString("gif_url"),
+                        originalUrl = secureUrl(item.optString("original_url")),
+                        livePhotoUrl = secureUrl(item.optString("gif_url")),
                         width = item.optInt("width").coerceAtLeast(0),
                         height = item.optInt("height").coerceAtLeast(0),
                     )
@@ -164,4 +164,7 @@ object DouyinMediaMapper {
             }
         }
     }
+
+    private fun secureUrl(url: String): String =
+        if (url.startsWith("http://")) "https://" + url.removePrefix("http://") else url
 }
