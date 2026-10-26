@@ -2,6 +2,19 @@
 
 All notable changes to ClipCove are documented here.
 
+## [1.3.1] - 2026-10-26
+
+### Added
+
+- Added a Gitee mirror download route with the same SHA-256, package, version, and signing-certificate verification.
+- Added ABI-aware APK selection for ARM64 phones and x86_64 emulators.
+
+### Changed
+
+- Update route probing now measures real transfer throughput instead of choosing only by first-byte latency.
+- Added a 39 MB ABI-specific R8 test-release artifact to reduce update download time.
+- Version name set to `1.3.1` (`versionCode` 24).
+
 ## [1.3.0] - 2026-10-26
 
 ### Added

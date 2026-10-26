@@ -9,10 +9,17 @@ plugins {
 // Stable releases use 1.x.x; reserve 2.x.x for a major architecture change.
 val versionMajor = 1
 val versionMinor = 3
-val versionPatch = 0
+val versionPatch = 1
 val versionSuffix = ""
 val appVersionName = "$versionMajor.$versionMinor.$versionPatch$versionSuffix"
-val appVersionCode = 23
+val appVersionCode = 24
+val requestedAbis = providers.gradleProperty("clipcoveAbis")
+    .orNull
+    ?.split(',')
+    ?.map(String::trim)
+    ?.filter(String::isNotEmpty)
+    ?.takeIf(List<String>::isNotEmpty)
+    ?: listOf("arm64-v8a", "x86_64")
 
 val keystorePropertiesFile = rootProject.file("keystore.properties")
 val keystoreProperties = Properties().apply {
@@ -36,7 +43,7 @@ android {
         versionName = appVersionName
 
         ndk {
-            abiFilters += listOf("arm64-v8a", "x86_64")
+            abiFilters += requestedAbis
         }
     }
 
@@ -60,6 +67,11 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+        }
+        create("stagingRelease") {
+            initWith(getByName("release"))
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += listOf("release")
         }
     }
     compileOptions {

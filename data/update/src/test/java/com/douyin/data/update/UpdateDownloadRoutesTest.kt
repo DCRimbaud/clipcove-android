@@ -8,6 +8,7 @@
 package com.douyin.data.update
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Test
 
 /** Protects update route allowlisting and direct-only behavior. */
@@ -27,15 +28,19 @@ class UpdateDownloadRoutesTest {
     fun `automatic mode puts GitHub first then mirrors`() {
         val routes = UpdateDownloadRoutes.candidates(githubUrl, true)
 
-        assertEquals(8, routes.size)
+        assertEquals(9, routes.size)
         assertEquals(githubUrl, routes.first())
-        assertEquals(githubUrl, routes[1].removePrefix("https://gh.llkk.cc/"))
-        assertEquals(githubUrl, routes[2].removePrefix("https://gh.ddlc.top/"))
-        assertEquals(githubUrl, routes[3].removePrefix("https://gh.monlor.com/"))
-        assertEquals(githubUrl, routes[4].removePrefix("https://gh.idayer.com/"))
-        assertEquals(githubUrl, routes[5].removePrefix("https://ghfast.top/"))
-        assertEquals(githubUrl, routes[6].removePrefix("https://gh-proxy.com/"))
-        assertEquals(githubUrl, routes[7].removePrefix("https://ghproxy.net/"))
+        assertEquals(
+            "https://gitee.com/a917947622/clipcove-android/raw/release-assets/v1.0.0/app.apk",
+            routes[1],
+        )
+        assertEquals(githubUrl, routes[2].removePrefix("https://gh.llkk.cc/"))
+        assertEquals(githubUrl, routes[3].removePrefix("https://gh.ddlc.top/"))
+        assertEquals(githubUrl, routes[4].removePrefix("https://gh.monlor.com/"))
+        assertEquals(githubUrl, routes[5].removePrefix("https://gh.idayer.com/"))
+        assertEquals(githubUrl, routes[6].removePrefix("https://ghfast.top/"))
+        assertEquals(githubUrl, routes[7].removePrefix("https://gh-proxy.com/"))
+        assertEquals(githubUrl, routes[8].removePrefix("https://ghproxy.net/"))
     }
 
     /** Ensures API requests use only API-compatible proxy routes. */
@@ -48,6 +53,15 @@ class UpdateDownloadRoutesTest {
         assertEquals(apiUrl, routes.first())
         assertEquals(apiUrl, routes[1].removePrefix("https://gh-proxy.com/"))
         assertEquals(apiUrl, routes[2].removePrefix("https://gh.idayer.com/"))
+    }
+
+    /** Ensures other GitHub projects never receive the ClipCove Gitee mirror route. */
+    @Test
+    fun `other GitHub repositories do not use ClipCove mirror`() {
+        val other = "https://github.com/example/another/releases/download/v1.0.0/app.apk"
+        val routes = UpdateDownloadRoutes.candidates(other, true)
+
+        assertFalse(routes.any { it.contains("gitee.com/a917947622") })
     }
 
     /** Ensures arbitrary download hosts cannot receive GitHub proxy prefixes. */

@@ -66,11 +66,10 @@ class AndroidUpdateInstaller(
             return@withContext InstallResult.PermissionRequired
         }
 
-        val apkAsset = release.assets.firstOrNull { it.name.endsWith(".apk", ignoreCase = true) }
-            ?: throw UpdateException("该版本未提供 APK 安装包，请打开 GitHub 发布页手动下载")
-        val checksumAsset = release.assets.firstOrNull {
-            it.name.endsWith(".sha256", ignoreCase = true)
-        } ?: throw UpdateException("该版本缺少校验文件，请打开 GitHub 发布页手动下载")
+        val apkAsset = UpdateAssetSelector.selectApk(release.assets, Build.SUPPORTED_ABIS.toList())
+            ?: throw UpdateException("该版本没有适用于当前设备的安装包，请打开 GitHub 发布页手动下载")
+        val checksumAsset = UpdateAssetSelector.checksumFor(release.assets, apkAsset)
+            ?: throw UpdateException("该版本缺少对应安装包的校验文件，请打开 GitHub 发布页手动下载")
         val expectedHash = fetchChecksum(checksumAsset, allowMirrors)
             ?: throw UpdateException("更新包校验文件无效，请稍后重试")
 
@@ -193,46 +192,72 @@ class AndroidUpdateInstaller(
                 async(Dispatchers.IO) { probeRoute(route) }
             }.awaitAll()
         }
-        val reachable = probes.filter { it.reachable }.sortedBy { it.elapsedMs }
+        // Rank by measured transfer throughput, not just time-to-first-byte.
+        // A low-latency route can still be throttled to a fraction of a faster route.
+        val reachable = probes
+            .filter { it.reachable }
+            .sortedWith(compareByDescending<ProbeResult> { it.throughputBps }.thenBy { it.latencyMs })
         val unreachable = probes.filterNot { it.reachable }
         val ordered = (reachable + unreachable).map { it.url }
-        Log.d(TAG, "update routes: " + probes.joinToString { "${it.url.substringAfter("://").substringBefore('/')}:${if (it.reachable) "${it.elapsedMs}ms" else "offline"}" })
+        Log.d(
+            TAG,
+            "update routes: " + probes.joinToString {
+                val host = it.url.substringAfter("://").substringBefore('/')
+                if (it.reachable) {
+                    "$host:${it.throughputBps / 1024}KB/s/${it.latencyMs}ms"
+                } else {
+                    "$host:offline"
+                }
+            },
+        )
         return ordered
     }
 
     private fun probeRoute(url: String): ProbeResult {
         val startedAt = System.nanoTime()
+        var firstByteAt = 0L
         return try {
             val request = Request.Builder()
                 .url(url)
                 .header("User-Agent", USER_AGENT)
-                .header("Range", "bytes=0-32767")
+                .header("Range", "bytes=0-${PROBE_BYTES - 1}")
                 .get()
                 .build()
             probeClient.newCall(request).execute().use { response ->
                 val body = response.body
-                val readable = response.isSuccessful && body != null && body.byteStream().use { input ->
-                    input.read(ByteArray(PROBE_BYTES)) > 0
+                var bytesRead = 0L
+                if (response.isSuccessful && body != null) {
+                    body.byteStream().use { input ->
+                        val buffer = ByteArray(64 * 1024)
+                        val deadline = startedAt + PROBE_WINDOW_MS * 1_000_000
+                        while (bytesRead < PROBE_BYTES && System.nanoTime() < deadline) {
+                            val read = input.read(buffer)
+                            if (read < 0) break
+                            if (read > 0 && firstByteAt == 0L) firstByteAt = System.nanoTime()
+                            bytesRead += read
+                        }
+                    }
                 }
+                val finishedAt = System.nanoTime()
+                val transferNanos = (finishedAt - (firstByteAt.takeIf { it > 0 } ?: startedAt))
+                    .coerceAtLeast(1L)
                 ProbeResult(
                     url = url,
-                    reachable = readable,
-                    elapsedMs = (System.nanoTime() - startedAt) / 1_000_000,
+                    reachable = bytesRead > 0,
+                    latencyMs = ((firstByteAt.takeIf { it > 0 } ?: finishedAt) - startedAt) / 1_000_000,
+                    throughputBps = if (bytesRead > 0) bytesRead * 1_000_000_000L / transferNanos else 0L,
                 )
             }
         } catch (error: Exception) {
-            ProbeResult(
-                url = url,
-                reachable = false,
-                elapsedMs = (System.nanoTime() - startedAt) / 1_000_000,
-            )
+            ProbeResult(url = url, reachable = false, latencyMs = 0, throughputBps = 0)
         }
     }
 
     private data class ProbeResult(
         val url: String,
         val reachable: Boolean,
-        val elapsedMs: Long,
+        val latencyMs: Long,
+        val throughputBps: Long,
     )
 
     private fun downloadAttempt(
@@ -410,7 +435,8 @@ class AndroidUpdateInstaller(
 
     private companion object {
         const val MAX_RETRIES_PER_SOURCE = 1
-        const val PROBE_BYTES = 32 * 1024
+        const val PROBE_BYTES = 384 * 1024
+        const val PROBE_WINDOW_MS = 2_500L
         const val TAG = "ClipCoveUpdate"
         const val USER_AGENT = "ClipCove-Android-Updater"
 

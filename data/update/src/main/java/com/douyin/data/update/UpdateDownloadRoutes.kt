@@ -9,6 +9,11 @@ package com.douyin.data.update
 
 /** Allowlisted mirror routes for GitHub release metadata and APK assets. */
 internal object UpdateDownloadRoutes {
+    private const val GITHUB_RELEASE_PREFIX =
+        "https://github.com/DCRimbaud/clipcove-android/releases/download/"
+    private const val GITEE_ASSET_PREFIX =
+        "https://gitee.com/a917947622/clipcove-android/raw/release-assets/"
+
     private val binaryMirrorPrefixes = listOf(
         "https://gh.llkk.cc/",
         "https://gh.ddlc.top/",
@@ -40,9 +45,18 @@ internal object UpdateDownloadRoutes {
         }
         return buildList {
             add(originalUrl)
+            giteeReleaseAsset(originalUrl)?.let(::add)
             prefixes.forEach { prefix ->
                 add(prefix.trimEnd('/') + "/" + originalUrl)
             }
         }.distinct()
+    }
+
+    /** Maps canonical ClipCove release assets to the read-only Gitee asset mirror. */
+    private fun giteeReleaseAsset(originalUrl: String): String? {
+        if (!originalUrl.startsWith(GITHUB_RELEASE_PREFIX)) return null
+        val releasePath = originalUrl.removePrefix(GITHUB_RELEASE_PREFIX)
+        if (releasePath.isBlank()) return null
+        return GITEE_ASSET_PREFIX + releasePath
     }
 }
