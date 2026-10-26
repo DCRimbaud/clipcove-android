@@ -18,7 +18,7 @@ data class AppRelease(
 )
 
 interface UpdateRepository {
-    suspend fun getReleases(): List<AppRelease>
+    suspend fun getReleases(allowMirrors: Boolean = true): List<AppRelease>
 }
 
 object ReleaseSelector {
