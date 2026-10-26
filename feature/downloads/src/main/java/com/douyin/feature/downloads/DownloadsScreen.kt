@@ -1,3 +1,10 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * Copyright (c) 2026 DCRimbaud
+ * Author: DCRimbaud
+ *
+ * Renders download filters, task actions, progress, and destructive confirmations.
+ */
 package com.douyin.feature.downloads
 
 import android.Manifest
@@ -61,6 +68,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -85,10 +93,17 @@ import com.douyin.core.designsystem.DyTextSecondary
 import com.douyin.core.designsystem.dyPressable
 import com.douyin.data.download.DownloadRepository
 import com.douyin.data.download.DownloadStatus
+import com.douyin.core.uiresources.R as SharedR
 import com.douyin.data.download.DownloadTask
 import java.io.File
 
 @Composable
+/**
+ * Observes all download tasks and renders filtering, progress, and task actions.
+ *
+ * Destructive actions require explicit confirmation. The screen owns only local
+ * query/dialog state; repository state remains the source of truth.
+ */
 fun DownloadsScreen(repository: DownloadRepository) {
     val tasks by repository.tasks.collectAsStateWithLifecycle()
     val activeCount = tasks.count {
@@ -107,25 +122,45 @@ fun DownloadsScreen(repository: DownloadRepository) {
         modifier = Modifier.fillMaxSize().padding(start = 18.dp, end = 18.dp, top = 14.dp),
     ) {
         DyPageHeader(
-            title = "下载管理",
-            subtitle = "文件只保存在本机，可暂停、续传和另存。",
-            eyebrow = "DOWNLOADS",
-            trailing = { DyPill(text = "${tasks.size} 项", color = DyCyan) },
+            title = stringResource(SharedR.string.nav_downloads),
+            subtitle = stringResource(SharedR.string.downloads_subtitle),
+            eyebrow = stringResource(SharedR.string.nav_downloads),
+            trailing = {
+                DyPill(
+                    text = stringResource(SharedR.string.unit_items, tasks.size),
+                    color = DyCyan,
+                )
+            },
         )
         Spacer(Modifier.height(16.dp))
 
         if (tasks.isEmpty()) {
             DyEmptyState(
                 icon = Icons.Filled.Download,
-                title = "还没有下载任务",
-                description = "解析作品后点击下载，视频、图片和原声会集中显示在这里。",
+                title = stringResource(SharedR.string.downloads_empty_title),
+                description = stringResource(SharedR.string.downloads_empty_description),
             )
         } else {
             DyPanel(contentPadding = 14.dp) {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    SummaryMetric("进行中", activeCount.toString(), DyCyan, Modifier.weight(1f))
-                    SummaryMetric("已完成", completedCount.toString(), DyGreen, Modifier.weight(1f))
-                    SummaryMetric("全部", tasks.size.toString(), DyText, Modifier.weight(1f))
+                    SummaryMetric(
+                        stringResource(SharedR.string.downloads_active),
+                        activeCount.toString(),
+                        DyCyan,
+                        Modifier.weight(1f),
+                    )
+                    SummaryMetric(
+                        stringResource(SharedR.string.downloads_completed),
+                        completedCount.toString(),
+                        DyGreen,
+                        Modifier.weight(1f),
+                    )
+                    SummaryMetric(
+                        stringResource(SharedR.string.downloads_all),
+                        tasks.size.toString(),
+                        DyText,
+                        Modifier.weight(1f),
+                    )
                 }
             }
             Spacer(Modifier.height(14.dp))
@@ -134,14 +169,23 @@ fun DownloadsScreen(repository: DownloadRepository) {
                 onValueChange = { query = it },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                placeholder = { Text("搜索标题或文件名", color = DyTextSecondary) },
+                placeholder = {
+                    Text(
+                        stringResource(SharedR.string.downloads_search_hint),
+                        color = DyTextSecondary,
+                    )
+                },
                 leadingIcon = {
                     Icon(Icons.Filled.Search, contentDescription = null, tint = DyTextSecondary)
                 },
                 trailingIcon = {
                     if (query.isNotBlank()) {
                         IconButton(onClick = { query = "" }) {
-                            Icon(Icons.Filled.Close, contentDescription = "清空搜索", tint = DyTextSecondary)
+                            Icon(
+                                Icons.Filled.Close,
+                                contentDescription = stringResource(SharedR.string.action_clear_search),
+                                tint = DyTextSecondary,
+                            )
                         }
                     }
                 },
@@ -162,10 +206,10 @@ fun DownloadsScreen(repository: DownloadRepository) {
                 DownloadFilter.entries.forEach { option ->
                     FilterChip(
                         label = when (option) {
-                            DownloadFilter.ACTIVE -> "进行中 ${activeCount}"
-                            DownloadFilter.DONE -> "已完成 ${completedCount}"
-                            DownloadFilter.FAILED -> "失败 ${failedCount}"
-                            DownloadFilter.ALL -> "全部 ${tasks.size}"
+                            DownloadFilter.ACTIVE -> "${stringResource(SharedR.string.downloads_active)} $activeCount"
+                            DownloadFilter.DONE -> "${stringResource(SharedR.string.downloads_completed)} $completedCount"
+                            DownloadFilter.FAILED -> "${stringResource(SharedR.string.downloads_failed)} $failedCount"
+                            DownloadFilter.ALL -> "${stringResource(SharedR.string.downloads_all)} ${tasks.size}"
                         },
                         selected = filter == option,
                         modifier = Modifier.weight(1f),
@@ -194,7 +238,11 @@ fun DownloadsScreen(repository: DownloadRepository) {
                     Spacer(Modifier.height(4.dp))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                         TextButton(onClick = { confirmClearCompleted = true }) {
-                            Text("清理已完成", color = DyRed, fontSize = 12.sp)
+                            Text(
+                                stringResource(SharedR.string.downloads_clear_completed),
+                                color = DyRed,
+                                fontSize = 12.sp,
+                            )
                         }
                     }
                 }
@@ -231,7 +279,11 @@ fun DownloadsScreen(repository: DownloadRepository) {
                 if (empty) {
                     DyPanel(contentPadding = 16.dp) {
                         Text(
-                            if (query.isBlank()) "当前分类没有下载任务" else "没有匹配“$query”的下载任务",
+                            if (query.isBlank()) {
+                                stringResource(SharedR.string.downloads_empty_category)
+                            } else {
+                                stringResource(SharedR.string.downloads_no_search_results, query)
+                            },
                             style = MaterialTheme.typography.bodyMedium,
                             color = DyTextSecondary,
                         )
@@ -255,10 +307,18 @@ fun DownloadsScreen(repository: DownloadRepository) {
         AlertDialog(
             onDismissRequest = { confirmClearCompleted = false },
             containerColor = DyCard,
-            title = { Text("清理已完成任务？", color = DyText) },
+            title = {
+                Text(
+                    stringResource(SharedR.string.downloads_clear_dialog_title),
+                    color = DyText,
+                )
+            },
             text = {
                 Text(
-                    "会删除应用内保存的 $completedCount 个已完成文件；已经另存到系统下载目录的副本不会受影响。",
+                    stringResource(
+                        SharedR.string.downloads_clear_dialog_description,
+                        completedCount,
+                    ),
                     color = DyTextSecondary,
                 )
             },
@@ -269,11 +329,11 @@ fun DownloadsScreen(repository: DownloadRepository) {
                         tasks.filter { it.status == DownloadStatus.DONE }.forEach(repository::remove)
                         if (filter == DownloadFilter.DONE) filter = DownloadFilter.ALL
                     },
-                ) { Text("清理", color = DyRed) }
+                ) { Text(stringResource(SharedR.string.action_clear), color = DyRed) }
             },
             dismissButton = {
                 TextButton(onClick = { confirmClearCompleted = false }) {
-                    Text("取消", color = DyTextSecondary)
+                    Text(stringResource(SharedR.string.action_cancel), color = DyTextSecondary)
                 }
             },
         )
@@ -402,25 +462,47 @@ private fun DownloadActions(task: DownloadTask, repository: DownloadRepository, 
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
         when (task.status) {
             DownloadStatus.DOWNLOADING -> {
-                TaskAction("暂停", DyCyan, Modifier.weight(1f)) { repository.pause(task) }
-                TaskAction("取消", DyRed, Modifier.weight(1f)) { repository.remove(task) }
+                TaskAction(stringResource(SharedR.string.action_pause), DyCyan, Modifier.weight(1f)) {
+                    repository.pause(task)
+                }
+                TaskAction(stringResource(SharedR.string.action_cancel), DyRed, Modifier.weight(1f)) {
+                    repository.remove(task)
+                }
             }
             DownloadStatus.PAUSED -> {
-                TaskAction("继续", DyGreen, Modifier.weight(1f)) { repository.resume(task) }
-                TaskAction("删除", DyRed, Modifier.weight(1f)) { repository.remove(task) }
+                TaskAction(stringResource(SharedR.string.action_resume), DyGreen, Modifier.weight(1f)) {
+                    repository.resume(task)
+                }
+                TaskAction(stringResource(SharedR.string.action_delete), DyRed, Modifier.weight(1f)) {
+                    repository.remove(task)
+                }
             }
             DownloadStatus.FAILED -> {
-                TaskAction("重试", DyCyan, Modifier.weight(1f)) { repository.resume(task) }
-                TaskAction("删除", DyRed, Modifier.weight(1f)) { repository.remove(task) }
+                TaskAction(stringResource(SharedR.string.action_retry), DyCyan, Modifier.weight(1f)) {
+                    repository.resume(task)
+                }
+                TaskAction(stringResource(SharedR.string.action_delete), DyRed, Modifier.weight(1f)) {
+                    repository.remove(task)
+                }
             }
             DownloadStatus.QUEUED -> {
-                TaskAction("取消", DyRed, Modifier.weight(1f)) { repository.remove(task) }
+                TaskAction(stringResource(SharedR.string.action_cancel), DyRed, Modifier.weight(1f)) {
+                    repository.remove(task)
+                }
             }
             DownloadStatus.DONE -> {
-                TaskAction("打开", DyText, Modifier.weight(1f)) { openDownloaded(context, task) }
-                TaskAction("分享", DyText, Modifier.weight(1f)) { shareDownloaded(context, task) }
-                TaskAction("另存", DyText, Modifier.weight(1f)) { saveToDownloads(context, task) }
-                TaskAction("删除", DyRed, Modifier.weight(1f)) { repository.remove(task) }
+                TaskAction(stringResource(SharedR.string.action_open), DyText, Modifier.weight(1f)) {
+                    openDownloaded(context, task)
+                }
+                TaskAction(stringResource(SharedR.string.action_share), DyText, Modifier.weight(1f)) {
+                    shareDownloaded(context, task)
+                }
+                TaskAction(stringResource(SharedR.string.action_save_as), DyText, Modifier.weight(1f)) {
+                    saveToDownloads(context, task)
+                }
+                TaskAction(stringResource(SharedR.string.action_delete), DyRed, Modifier.weight(1f)) {
+                    repository.remove(task)
+                }
             }
         }
     }
@@ -433,20 +515,25 @@ private fun TaskAction(text: String, color: Color, modifier: Modifier = Modifier
     }
 }
 
+@Composable
 private fun downloadDetail(task: DownloadTask): String = when (task.status) {
-    DownloadStatus.QUEUED -> "等待下载"
+    DownloadStatus.QUEUED -> stringResource(SharedR.string.downloads_status_queued_detail)
     DownloadStatus.DOWNLOADING -> "${task.progress}% · ${formatSpeed(task.speedBps)}"
-    DownloadStatus.PAUSED -> "${task.progress}% · 支持断点续传"
-    DownloadStatus.DONE -> "已完成"
-    DownloadStatus.FAILED -> "下载失败，可点击重试"
+    DownloadStatus.PAUSED -> stringResource(
+        SharedR.string.downloads_status_paused_detail,
+        task.progress,
+    )
+    DownloadStatus.DONE -> stringResource(SharedR.string.downloads_status_done_detail)
+    DownloadStatus.FAILED -> stringResource(SharedR.string.downloads_status_failed_detail)
 }
 
+@Composable
 private fun DownloadStatus.label(): String = when (this) {
-    DownloadStatus.QUEUED -> "排队中"
-    DownloadStatus.DOWNLOADING -> "下载中"
-    DownloadStatus.PAUSED -> "已暂停"
-    DownloadStatus.DONE -> "已完成"
-    DownloadStatus.FAILED -> "失败"
+    DownloadStatus.QUEUED -> stringResource(SharedR.string.downloads_status_queued)
+    DownloadStatus.DOWNLOADING -> stringResource(SharedR.string.downloads_status_downloading)
+    DownloadStatus.PAUSED -> stringResource(SharedR.string.downloads_status_paused)
+    DownloadStatus.DONE -> stringResource(SharedR.string.downloads_status_done)
+    DownloadStatus.FAILED -> stringResource(SharedR.string.downloads_status_failed)
 }
 
 private fun DownloadStatus.statusColor(): Color = when (this) {
@@ -457,28 +544,40 @@ private fun DownloadStatus.statusColor(): Color = when (this) {
 
 private fun openDownloaded(context: Context, task: DownloadTask) {
     try {
-        val uri = taskFileUri(context, task) ?: throw RuntimeException("文件不存在")
+        val uri = taskFileUri(context, task) ?: throw IllegalStateException()
         val intent = Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, guessMime(task.filename))
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-        context.startActivity(Intent.createChooser(intent, "打开"))
-    } catch (e: Exception) {
-        Toast.makeText(context, "无法打开：${e.message}", Toast.LENGTH_SHORT).show()
+        context.startActivity(
+            Intent.createChooser(intent, context.getString(SharedR.string.action_open))
+        )
+    } catch (_: Exception) {
+        Toast.makeText(
+            context,
+            context.getString(SharedR.string.downloads_open_failed),
+            Toast.LENGTH_SHORT,
+        ).show()
     }
 }
 
 private fun shareDownloaded(context: Context, task: DownloadTask) {
     try {
-        val uri = taskFileUri(context, task) ?: throw RuntimeException("文件不存在")
+        val uri = taskFileUri(context, task) ?: throw IllegalStateException()
         val intent = Intent(Intent.ACTION_SEND).apply {
             type = guessMime(task.filename)
             putExtra(Intent.EXTRA_STREAM, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-        context.startActivity(Intent.createChooser(intent, "分享"))
-    } catch (e: Exception) {
-        Toast.makeText(context, "分享失败：${e.message}", Toast.LENGTH_SHORT).show()
+        context.startActivity(
+            Intent.createChooser(intent, context.getString(SharedR.string.action_share))
+        )
+    } catch (_: Exception) {
+        Toast.makeText(
+            context,
+            context.getString(SharedR.string.downloads_share_failed),
+            Toast.LENGTH_SHORT,
+        ).show()
     }
 }
 
@@ -492,13 +591,17 @@ private fun saveToDownloads(context: Context, task: DownloadTask) {
             arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE),
             REQUEST_WRITE_STORAGE,
         )
-        Toast.makeText(context, "请允许存储权限后再次点击另存", Toast.LENGTH_LONG).show()
+        Toast.makeText(
+            context,
+            context.getString(SharedR.string.downloads_storage_permission),
+            Toast.LENGTH_LONG,
+        ).show()
         return
     }
     Thread {
         try {
             val src = File(task.filePath)
-            if (!src.exists()) throw RuntimeException("文件不存在")
+            if (!src.exists()) throw IllegalStateException()
             if (Build.VERSION.SDK_INT >= 29) {
                 val values = android.content.ContentValues().apply {
                     put(MediaStore.Downloads.DISPLAY_NAME, task.filename)
@@ -506,16 +609,28 @@ private fun saveToDownloads(context: Context, task: DownloadTask) {
                     put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
                 }
                 val uri = context.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
-                    ?: throw RuntimeException("保存失败")
-                val out = context.contentResolver.openOutputStream(uri) ?: throw RuntimeException("写入失败")
+                    ?: throw IllegalStateException()
+                val out = context.contentResolver.openOutputStream(uri) ?: throw IllegalStateException()
                 out.use { output -> src.inputStream().use { it.copyTo(output) } }
             } else {
                 val dest = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), task.filename)
                 src.copyTo(dest, overwrite = true)
             }
-            runOnUiThread(context) { Toast.makeText(context, "已保存到手机「下载」目录", Toast.LENGTH_LONG).show() }
-        } catch (e: Exception) {
-            runOnUiThread(context) { Toast.makeText(context, "保存失败：${e.message}", Toast.LENGTH_LONG).show() }
+            runOnUiThread(context) {
+                Toast.makeText(
+                    context,
+                    context.getString(SharedR.string.downloads_saved),
+                    Toast.LENGTH_LONG,
+                ).show()
+            }
+        } catch (_: Exception) {
+            runOnUiThread(context) {
+                Toast.makeText(
+                    context,
+                    context.getString(SharedR.string.downloads_save_failed),
+                    Toast.LENGTH_LONG,
+                ).show()
+            }
         }
     }.start()
 }

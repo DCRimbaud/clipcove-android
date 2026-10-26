@@ -27,6 +27,7 @@ python tools\smoke_network.py
 - Never commit cookies, tokens, private keys, personal share links, or copyrighted media.
 - Do not commit `local.properties`, build outputs, logs, or APKs.
 - Add parser fixtures with synthetic IDs and redacted URLs.
+- Keep first-party source comments in English with SPDX headers and documented public contracts; run `python tools\check_comments.py`.
 
 ## Third-Party Code
 

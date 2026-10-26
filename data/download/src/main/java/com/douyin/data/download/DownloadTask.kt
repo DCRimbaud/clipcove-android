@@ -1,11 +1,18 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * Copyright (c) 2026 DCRimbaud
+ * Author: DCRimbaud
+ *
+ * Defines the thread-safe persisted download-task state and JSON serialization.
+ */
 package com.douyin.data.download
 
 import org.json.JSONObject
 
-/** 下载状态 */
+/** Persisted download lifecycle state. */
 enum class DownloadStatus { QUEUED, DOWNLOADING, PAUSED, DONE, FAILED }
 
-/** 下载任务数据模型(跨线程读写,状态字段 volatile 保证可见性) */
+/** Download task shared across threads; volatile mutable fields publish state changes safely. */
 data class DownloadTask(
     val id: Long,
     val title: String,
@@ -13,22 +20,22 @@ data class DownloadTask(
     val url: String,
     @Volatile var status: DownloadStatus = DownloadStatus.QUEUED,
     @Volatile var progress: Int = 0,
-    /** 实时下载速度(字节/秒),用于 UI 显示 */
+    /** Current transfer speed in bytes per second for UI display. */
     @Volatile var speedBps: Long = 0,
     @Volatile var downloadedBytes: Long = 0,
     @Volatile var totalBytes: Long = 0,
     @Volatile var filePath: String = "",
-    /** 是否已保存到公共「下载」目录(避免重复另存) */
+    /** Whether the completed file was already copied to the public Downloads collection. */
     @Volatile var savedToPublic: Boolean = false,
-    /** 取消标志:remove 时置位,下载循环检查后立即终止并清理文件 */
+    /** Cancellation flag set by removal so the worker stops and cleans its files. */
     @Volatile var cancelled: Boolean = false,
-    /** 当前失败重试次数 */
+    /** Number of retries already consumed by the current task. */
     @Volatile var retryCount: Int = 0,
-    /** 暂停标志:pause 时置位,下载循环检查后退出但保留 .part 断点文件 */
+    /** Pause flag checked by the worker; the part file is retained for resume. */
     @Volatile var paused: Boolean = false
 ) {
 
-    /** 序列化为 JSON(持久化到本地,重启后恢复任务列表) */
+    /** Serializes the task for app-private persistence and restart recovery. */
     fun toJson(): JSONObject = JSONObject().apply {
         put("id", id)
         put("title", title)
@@ -47,7 +54,13 @@ data class DownloadTask(
     }
 
     companion object {
-        fun fromJson(o: JSONObject): DownloadTask = DownloadTask(
+        /**
+     * Rehydrates a persisted task snapshot.
+     *
+     * Missing fields use safe defaults so a partially written task file cannot
+     * crash startup. File validity is checked by the repository after parsing.
+     */
+    fun fromJson(o: JSONObject): DownloadTask = DownloadTask(
             id = o.optLong("id"),
             title = o.optString("title"),
             filename = o.optString("filename"),

@@ -1,4 +1,4 @@
-﻿plugins {
+plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
 }
@@ -16,6 +16,7 @@ android {
 dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:designsystem"))
+    implementation(project(":core:ui-resources"))
     implementation(project(":core:common"))
     implementation(project(":data:douyin"))
     implementation(project(":data:download"))

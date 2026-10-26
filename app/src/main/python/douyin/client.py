@@ -1,4 +1,9 @@
-"""抖音 Web API 客户端:签名请求详情接口,提取无水印直链。"""
+"""Douyin web API client, signed request transport, and media extraction helpers.
+
+SPDX-License-Identifier: GPL-3.0-only
+Copyright (c) 2026 DCRimbaud
+Author: DCRimbaud
+"""
 
 import random
 import string
@@ -12,13 +17,13 @@ from .parser import UA
 
 DETAIL_URL = "https://www.douyin.com/aweme/v1/web/aweme/detail/"
 
-# 2026-08 起详情接口由 ArgusSecurityPlugin 做前置校验，缺少该请求头会直接返回 403。
-# 当前网关只检查请求头存在，不需要登录 Cookie。
+# Since August 2026 the detail endpoint is guarded by ArgusSecurityPlugin.
+# The current gateway checks for the header's presence and does not require a login cookie.
 ARGUS_HEADERS = {"x-tt-argus": "1"}
 
 
 class DouyinApiError(RuntimeError):
-    """带稳定错误码的平台异常，供 Kotlin 层映射为用户可操作状态。"""
+    """Platform error carrying a stable code and bounded diagnostic detail."""
 
     def __init__(self, code: str, message: str, debug_detail: str = ""):
         super().__init__(message)
@@ -26,7 +31,7 @@ class DouyinApiError(RuntimeError):
         self.debug_detail = debug_detail[:500]
 
 
-# 与 abogus 签名对应的浏览器参数集(改动需与 UA 保持一致)
+# Browser parameters used by the abogus signature; keep them aligned with User-Agent.
 BASE_PARAMS = {
     "device_platform": "webapp",
     "aid": "6383",
@@ -68,12 +73,12 @@ TTWID_PAYLOAD = {
 
 
 def best_image_url(url_list: list[str]) -> str:
-    """选择平台提供且可直接下载的图片直链。
+    """Select a directly downloadable image URL from a platform response.
 
-    签名的 ``~tplv-...`` 路径不能简单去掉再请求：CDN 会把去掉路径后的
-    URL 当成另一个对象并返回 403。``url_list`` 里的 JPEG 版本仍然是
-    平台渲染图（不是带作者水印的 ``download_url_list``），优先选择它，
-    这样文件扩展名和响应内容也更一致。
+    Signed ``~tplv-...`` paths must not be stripped: the CDN treats the
+    rewritten path as a different object and returns HTTP 403. Prefer the
+    platform-rendered JPEG in ``url_list`` (not the watermarked
+    ``download_url_list``) so the extension and response content also agree.
     """
     urls = [url for url in url_list if url]
     if not urls:
@@ -90,7 +95,7 @@ def best_image_url(url_list: list[str]) -> str:
 
 
 def gen_verify_fp() -> str:
-    """生成 s_v_web_id (verify_fp)。"""
+    """Generate the browser-style ``s_v_web_id`` verification fingerprint."""
     base36 = ""
     t = int(time.time() * 1000)
     while t > 0:
@@ -100,6 +105,8 @@ def gen_verify_fp() -> str:
 
 
 class DouyinClient:
+    """Signed HTTP client for Douyin detail requests and media extraction."""
+
     def __init__(self, cookie: str = "", timeout: int = 15):
         self.cookie = cookie
         self.timeout = timeout
@@ -112,7 +119,7 @@ class DouyinClient:
                 **ARGUS_HEADERS,
             }
         )
-        # ttwid 总是注册(cookie jar),用户 Cookie 解析后合并进 jar,避免覆盖
+        # Register ttwid in the shared cookie jar, then merge any user-provided cookies.
         self._register_ttwid()
         if cookie:
             for pair in cookie.split(";"):
@@ -122,7 +129,7 @@ class DouyinClient:
                     self.session.cookies.set(k.strip(), v.strip(), domain=".douyin.com")
 
     def _register_ttwid(self):
-        """注册 ttwid cookie(接口必需)。"""
+        """Register a ttwid cookie required by the detail endpoint."""
         try:
             resp = self.session.post(TTWID_URL, json=TTWID_PAYLOAD, timeout=self.timeout)
             ttwid = resp.cookies.get("ttwid")
@@ -150,6 +157,18 @@ class DouyinClient:
         return f"{DETAIL_URL}?{urlencode(params)}"
 
     def fetch_detail(self, aweme_id: str) -> dict:
+        """Fetch one aweme detail object, retrying only transient gateway failures.
+
+        Args:
+            aweme_id: Numeric Douyin work identifier.
+
+        Returns:
+            The unwrapped ``aweme_detail`` object.
+
+        Raises:
+            DouyinApiError: The platform rejects the request or returns an
+                unexpected response contract.
+        """
         url = self._signed_url(aweme_id)
         for attempt in range(3):
             resp = self.session.get(url, timeout=self.timeout)
@@ -227,74 +246,138 @@ class DouyinClient:
         raise DouyinApiError("NETWORK", "获取抖音详情失败，请稍后重试")
 
     def extract_video(self, detail: dict) -> dict:
-        """从详情数据中提取无水印视频直链等核心信息。
+        """Extract normalized, displayable, and downloadable media fields from detail JSON.
 
-        图集(aweme_type=68/69 等)没有视频画面,其 video.play_addr 实际是音频地址,
-        此时返回 images 图片列表,play_url 为空。
+        Args:
+            detail: Raw ``aweme_detail`` object returned by the platform API.
+
+        Returns:
+            A JSON-serializable dictionary containing common metadata, images,
+            video candidates, and soundtrack fields.
+
+        Raises:
+            DouyinApiError: No usable video candidate exists for a video item.
         """
+
+        def first_url(value: dict | None) -> str:
+            """Return the first non-empty URL from common CDN URL containers."""
+            if not isinstance(value, dict):
+                return ""
+            for key in ("url_list", "urlList", "backup_urls", "backupUrls"):
+                urls = value.get(key)
+                if isinstance(urls, list):
+                    for url in urls:
+                        if url:
+                            return str(url)
+            return ""
+
+        def first_text(*values) -> str:
+            """Return the first non-blank value converted to trimmed text."""
+            for value in values:
+                if value is not None and str(value).strip():
+                    return str(value).strip()
+            return ""
+
         author = detail.get("author", {}) or {}
         stats = detail.get("statistics", {}) or {}
+        music = detail.get("music", {}) or {}
         video = detail.get("video", {}) or {}
-        images = detail.get("images") or []
+        position = detail.get("position", {}) or {}
+        poi = detail.get("poi_info", {}) or {}
+        images = detail.get("images") or detail.get("image_list") or []
+        description = first_text(detail.get("desc"), detail.get("caption"), "")
+        author_avatar = first_url(author.get("avatar_thumb")) or first_url(author.get("avatar_larger"))
+        music_play = first_url(music.get("play_url"))
+        music_cover = first_url(music.get("cover_large")) or first_url(music.get("cover_medium"))
+        hashtags = []
+        for item in detail.get("text_extra") or []:
+            if isinstance(item, dict):
+                name = first_text(item.get("hashtag_name"), item.get("hashtagName"), "")
+                if name and name not in hashtags:
+                    hashtags.append(name)
+
+        common = {
+            "aweme_id": str(detail.get("aweme_id")),
+            "title": description or first_text(detail.get("item_title"), "(无标题)"),
+            "description": description,
+            "author": first_text(author.get("nickname"), author.get("nickName"), ""),
+            "author_id": first_text(author.get("uid"), author.get("sec_uid"), ""),
+            "author_handle": first_text(author.get("unique_id"), author.get("short_id"), ""),
+            "author_avatar": author_avatar,
+            "hashtags": hashtags,
+            "location": first_text(poi.get("name"), poi.get("poi_name"), position.get("name"), ""),
+            "share_url": first_text(detail.get("share_url"), ""),
+            "create_time": detail.get("create_time"),
+            "stats": stats,
+            "duration": video.get("duration") or detail.get("duration") or 0,
+            "cover": first_url(video.get("cover")),
+            "music": music_play,
+            "music_title": first_text(music.get("title"), ""),
+            "music_author": first_text(music.get("author"), ""),
+            "music_duration": music.get("duration") or 0,
+            "music_cover": music_cover,
+            "images": [],
+            "play_url": "",
+            "play_urls": [],
+        }
 
         if images:
             image_items = []
             for img in images:
+                if not isinstance(img, dict):
+                    continue
                 url = best_image_url(img.get("url_list") or [])
                 item = {
                     "url": url,
-                    # 保留字段以兼容旧版 JSON 消费方；该值由客户端自行选择，
-                    # 不能通过删除 CDN 签名路径来伪造。
+                    # Keep this empty: a stripped CDN path is guaranteed to return HTTP 403.
                     "original_url": "",
                     "gif_url": "",
-                    "width": img.get("width"),
-                    "height": img.get("height"),
+                    "width": img.get("width") or 0,
+                    "height": img.get("height") or 0,
                 }
-                # 动态图(live photo / clip_type=5)自带视频流,下载它才是真正的动图
                 img_video = img.get("video") or {}
                 gif_addr = img_video.get("play_addr") or {}
                 if gif_addr.get("url_list"):
                     item["gif_url"] = gif_addr["url_list"][0]
                 image_items.append(item)
-            return {
-                "aweme_id": str(detail.get("aweme_id")),
-                "title": detail.get("desc", "") or "(无标题)",
-                "author": author.get("nickname", ""),
-                "create_time": detail.get("create_time"),
-                "stats": stats,
-                "duration": video.get("duration"),
-                "cover": ((video.get("cover", {}) or {}).get("url_list") or [""])[0],
-                "music": ((detail.get("music", {}) or {}).get("play_url", {}) or {}).get("url_list", [""])[0],
-                "music_title": ((detail.get("music", {}) or {}).get("title", "")) or "",
-                "images": image_items,
-                "play_url": "",
-                "play_urls": [],
-            }
+            common["images"] = image_items
+            return common
 
         play_addr = video.get("play_addr", {}) or {}
         candidates = []
-        if play_addr.get("url_list"):
-            candidates.append({"label": "play_addr", "url": play_addr["url_list"][0]})
+        seen_urls = set()
+
+        def add_candidate(label: str, addr: dict, bitrate: int = 0) -> None:
+            """Append a unique video candidate with quality and size metadata."""
+            url = first_url(addr)
+            if not url or url in seen_urls:
+                return
+            seen_urls.add(url)
+            candidates.append(
+                {
+                    "label": label,
+                    "url": url,
+                    "bitrate": bitrate or 0,
+                    "width": addr.get("width") or video.get("width") or 0,
+                    "height": addr.get("height") or video.get("height") or 0,
+                    "size": addr.get("data_size") or addr.get("file_size") or 0,
+                }
+            )
+
+        add_candidate("播放线路", play_addr)
         for i, br in enumerate(detail.get("video_bit_rate") or []):
+            if not isinstance(br, dict):
+                continue
             pa = br.get("play_addr", {}) or {}
-            if pa.get("url_list"):
-                candidates.append(
-                    {"label": f"bitrate_{i}", "url": pa["url_list"][0], "bitrate": br.get("bit_rate")}
-                )
+            add_candidate(
+                first_text(br.get("gear_name"), br.get("quality_name"), f"线路 {i + 1}"),
+                pa,
+                br.get("bit_rate") or 0,
+            )
         if not candidates:
             raise DouyinApiError("RESPONSE_CHANGED", "未找到可用的视频地址")
-        best = max(candidates, key=lambda c: c.get("bitrate") or 0)
-        return {
-            "aweme_id": str(detail.get("aweme_id")),
-            "title": detail.get("desc", "") or "(无标题)",
-            "author": author.get("nickname", ""),
-            "create_time": detail.get("create_time"),
-            "stats": stats,
-            "duration": video.get("duration"),
-            "cover": ((video.get("cover", {}) or {}).get("url_list") or [""])[0],
-            "music": ((detail.get("music", {}) or {}).get("play_url", {}) or {}).get("url_list", [""])[0],
-            "music_title": ((detail.get("music", {}) or {}).get("title", "")) or "",
-            "images": [],
-            "play_url": best["url"],
-            "play_urls": [{"label": c["label"], "url": c["url"], "bitrate": c.get("bitrate")} for c in candidates],
-        }
+
+        best = max(candidates, key=lambda item: item.get("bitrate") or 0)
+        common["play_url"] = best["url"]
+        common["play_urls"] = candidates
+        return common

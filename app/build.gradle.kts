@@ -8,11 +8,11 @@ plugins {
 
 // Stable releases use 1.x.x; reserve 2.x.x for a major architecture change.
 val versionMajor = 1
-val versionMinor = 2
-val versionPatch = 1
+val versionMinor = 3
+val versionPatch = 0
 val versionSuffix = ""
 val appVersionName = "$versionMajor.$versionMinor.$versionPatch$versionSuffix"
-val appVersionCode = 22
+val appVersionCode = 23
 
 val keystorePropertiesFile = rootProject.file("keystore.properties")
 val keystoreProperties = Properties().apply {
@@ -90,6 +90,7 @@ chaquopy {
 dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:designsystem"))
+    implementation(project(":core:ui-resources"))
     implementation(project(":core:common"))
     implementation(project(":data:douyin"))
     implementation(project(":data:download"))
@@ -123,4 +124,3 @@ dependencies {
     implementation(libs.koin.android)
     implementation(libs.koin.androidx.compose)
 }
-

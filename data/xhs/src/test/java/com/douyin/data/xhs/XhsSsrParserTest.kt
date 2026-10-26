@@ -1,3 +1,10 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * Copyright (c) 2026 DCRimbaud
+ * Author: DCRimbaud
+ *
+ * Protects Xiaohongshu SSR mapping, counters, image selection, and failure behavior.
+ */
 package com.douyin.data.xhs
 
 import com.douyin.core.model.MediaPlatform
@@ -11,15 +18,30 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+/** Protects Xiaohongshu SSR mapping, image selection, streams, and failures. */
 class XhsSsrParserTest {
 
+    /** Ensures video notes and human-readable counters map into normalized media. */
     @Test
     fun `maps video note and human readable counters`() {
         val note = JSONObject()
             .put("noteId", NOTE_ID)
             .put("title", "视频笔记")
+            .put("desc", "完整小红书笔记说明")
+            .put("ipLocation", "上海")
             .put("time", 1_789_951_505_000L)
-            .put("user", JSONObject().put("nickname", "作者").put("authorID", "author-1"))
+            .put(
+                "tagList",
+                JSONArray().put(JSONObject().put("name", "旅行")).put(JSONObject().put("name", "视频"))
+            )
+            .put(
+                "user",
+                JSONObject()
+                    .put("nickname", "作者")
+                    .put("authorID", "author-1")
+                    .put("redId", "clipcove")
+                    .put("avatar", JSONObject().put("url", "https://example.com/avatar.jpg"))
+            )
             .put(
                 "interactInfo",
                 JSONObject()
@@ -27,6 +49,15 @@ class XhsSsrParserTest {
                     .put("commentCount", "8")
                     .put("collectedCount", 30)
                     .put("shareCount", "2")
+                    .put("viewCount", "3.4万")
+            )
+            .put(
+                "music",
+                JSONObject()
+                    .put("title", "背景音乐")
+                    .put("author", "音乐人")
+                    .put("duration", 44)
+                    .put("playUrl", JSONObject().put("url", "https://example.com/music.mp3"))
             )
             .put(
                 "video",
@@ -57,10 +88,18 @@ class XhsSsrParserTest {
         assertEquals("https://example.com/video.mp4", media.videoUrl)
         assertEquals(10_520L, media.durationMs)
         assertEquals(12_000L, media.stats.diggCount)
+        assertEquals(34_000L, media.stats.playCount)
+        assertEquals("完整小红书笔记说明", media.description)
+        assertEquals("clipcove", media.authorHandle)
+        assertEquals(listOf("旅行", "视频"), media.hashtags)
+        assertEquals("上海", media.location)
+        assertEquals("https://example.com/music.mp3", media.musicUrl)
+        assertEquals(44_000L, media.musicDurationMs)
         assertEquals(1_789_951_505L, media.createdAtSeconds)
         assertTrue(media.hasVideo)
     }
 
+    /** Ensures gallery mapping selects the largest usable image variant. */
     @Test
     fun `maps image note and selects larger image variant`() {
         val note = JSONObject()
@@ -104,6 +143,7 @@ class XhsSsrParserTest {
         assertTrue(media.hasImages)
     }
 
+    /** Ensures CDN media URLs are upgraded to HTTPS before reaching the downloader. */
     @Test
     fun `upgrades insecure CDN URLs to HTTPS`() {
         val note = JSONObject()
@@ -142,6 +182,7 @@ class XhsSsrParserTest {
         assertEquals("https://example.com/original.jpg", media.images.single().preferredUrl)
     }
 
+    /** Ensures original Xiaohongshu video is preferred without discarding fallback candidates. */
     @Test
     fun `prefers origin video over watermarked stream`() {
         val note = JSONObject()
@@ -187,6 +228,7 @@ class XhsSsrParserTest {
         assertEquals(6_162_441L, media.videoCandidates.last().sizeBytes)
     }
 
+    /** Ensures the mobile Xiaohongshu SSR contract remains supported. */
     @Test
     fun `maps mobile noteData SSR payload`() {
         val mobileNote = JSONObject()
@@ -235,6 +277,7 @@ class XhsSsrParserTest {
         assertEquals("https://example.com/mobile-cover.jpg", media.coverUrl)
     }
 
+    /** Ensures multi-note SSR payloads select the note identified by the share URL. */
     @Test
     fun `selects the note matching the share url`() {
         val wrongNote = JSONObject()
@@ -265,6 +308,7 @@ class XhsSsrParserTest {
         assertEquals("https://example.com/right.jpg", media.coverUrl)
     }
 
+    /** Ensures legacy mediaV2 snake_case stream fields remain parseable. */
     @Test
     fun `supports mediaV2 snake case video stream`() {
         val mediaV2 = JSONObject().put(
@@ -300,6 +344,7 @@ class XhsSsrParserTest {
         assertEquals(2_973_769L, media.videoCandidates.single().bitrate)
     }
 
+    /** Ensures notes without a playable stream fail as content-unavailable. */
     @Test
     fun `rejects a video note without a playable stream`() {
         val note = JSONObject()
@@ -316,6 +361,7 @@ class XhsSsrParserTest {
         assertTrue(failure.message.contains("视频地址"))
     }
 
+    /** Ensures missing SSR state is reported as a response-contract change. */
     @Test
     fun `reports changed page structure when state is absent`() {
         val result = XhsSsrParser.parse("<html><body>blocked</body></html>", sourceUrl())

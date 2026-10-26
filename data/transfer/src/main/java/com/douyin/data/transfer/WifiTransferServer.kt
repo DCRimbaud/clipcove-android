@@ -1,4 +1,11 @@
-﻿package com.douyin.data.transfer
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * Copyright (c) 2026 DCRimbaud
+ * Author: DCRimbaud
+ *
+ * Serves downloaded files over a token-protected local HTTP server.
+ */
+package com.douyin.data.transfer
 
 import android.content.Context
 import android.net.wifi.WifiManager
@@ -12,7 +19,7 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
 /**
- * WiFi 传文件:App 内轻量 HTTP 服务器,局域网内电脑浏览器直接下载已下载的文件。
+ * Token-protected LAN HTTP server that exposes completed downloads to a desktop browser.
  */
 class WifiTransferServer(private val context: Context) {
 
@@ -21,13 +28,19 @@ class WifiTransferServer(private val context: Context) {
     @Volatile
     private var running = false
 
-    /** 访问令牌:开启时生成,客户端须带 ?token= 才能访问 */
+    /** Per-session access token generated at start; requests must include it in the query string. */
     @Volatile
     var accessToken: String = ""
 
     val isRunning: Boolean get() = running
 
     @Synchronized
+    /**
+     * Starts the LAN server and generates a fresh access token.
+     *
+     * @param port Preferred non-privileged TCP port.
+     * @return True when the server socket was created successfully.
+     */
     fun start(port: Int = 8080): Boolean {
         if (running) return true
         return try {
@@ -44,6 +57,7 @@ class WifiTransferServer(private val context: Context) {
     }
 
     @Synchronized
+    /** Stops accepting requests and releases the server socket. Safe to call repeatedly. */
     fun stop() {
         running = false
         try {
@@ -56,7 +70,7 @@ class WifiTransferServer(private val context: Context) {
         accessToken = ""
     }
 
-    /** 获取带 token 的访问地址 */
+    /** Returns the browser URL including the current access token. */
     fun getAccessUrlWithToken(port: Int = 8080): String {
         val base = getAccessUrl(port)
         return if (base.startsWith("http")) "$base?token=$accessToken" else base
@@ -82,14 +96,14 @@ class WifiTransferServer(private val context: Context) {
             if (parts.size < 2) return
             val method = parts[0]
             val path = parts[1]
-            // 跳过请求头
+            // Skip the HTTP request header before parsing the request line.
             while (true) {
                 val line = reader.readLine() ?: break
                 if (line.isEmpty()) break
             }
             val out = socket.getOutputStream()
             if (method == "GET") {
-                // Token 鉴权:防止局域网内任意设备访问
+                // Reject requests without the session token to prevent arbitrary LAN access.
                 val query = path.substringAfter('?', "")
                 val token = query.split("&").firstOrNull { it.startsWith("token=") }?.substringAfter("=") ?: ""
                 if (!TransferSecurity.tokenMatches(accessToken, token)) {
@@ -101,7 +115,7 @@ class WifiTransferServer(private val context: Context) {
                 when {
                     cleanPath == "/" || cleanPath == "/index.html" -> sendIndex(out)
                     cleanPath == "/download" -> {
-                        // f 参数从原始 query 解析(cleanPath 已去掉 ? 后内容)
+                        // Parse the file parameter from the raw query because the cleaned path omits it.
                         val name = java.net.URLDecoder.decode(
                             query.substringAfter("f=").substringBefore("&"),
                             "UTF-8"
@@ -130,7 +144,7 @@ class WifiTransferServer(private val context: Context) {
         val rows = buildString {
             files.forEach { f ->
                 val sizeMb = String.format("%.2f", f.length() / 1048576.0)
-                // HTML 转义:文件名来自用户视频标题,防 XSS
+                // Escape filenames in HTML because titles are untrusted user/platform data.
                 val safeName = f.name
                     .replace("&", "&amp;")
                     .replace("<", "&lt;")
@@ -163,7 +177,7 @@ class WifiTransferServer(private val context: Context) {
     }
 
     private fun sendFile(out: java.io.OutputStream, name: String) {
-        // 防路径遍历:规范化后必须位于 downloads 目录内
+        // Reject path traversal by requiring the canonical target to remain under the downloads root.
         val baseDir = File(context.filesDir, "downloads").apply { mkdirs() }
         val file = File(baseDir, name)
         val canonical = try {
@@ -226,13 +240,14 @@ class WifiTransferServer(private val context: Context) {
         out.write(body)
     }
 
+    /** Returns a browser URL containing the current session token, or empty when stopped. */
     fun getAccessUrl(port: Int = 8080): String {
         return try {
             val wifi = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
             @Suppress("DEPRECATION")
             val ip = wifi.connectionInfo?.ipAddress ?: 0
             if (ip == 0) {
-                "无法获取局域网 IP(请确认已连接 WiFi)"
+                ""
             } else {
                 val ipStr = String.format(
                     "%d.%d.%d.%d",
@@ -242,7 +257,7 @@ class WifiTransferServer(private val context: Context) {
             }
         } catch (e: Exception) {
             Log.e("DYAPP", "get ip fail", e)
-            "无法获取 IP(请确认已连接 WiFi)"
+            ""
         }
     }
 

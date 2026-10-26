@@ -1,3 +1,10 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * Copyright (c) 2026 DCRimbaud
+ * Author: DCRimbaud
+ *
+ * Publishes active download progress through a foreground notification and stops when no work remains.
+ */
 package com.douyin.parser
 
 import android.app.Notification
@@ -10,8 +17,10 @@ import android.content.Intent
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
+import com.douyin.core.uiresources.R as SharedR
 import com.douyin.data.download.DownloadRepository
 import com.douyin.data.download.DownloadStatus
+import com.douyin.data.settings.withAppLanguage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -22,14 +31,18 @@ import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 
 /**
- * 下载前台服务:下载进行中保持前台 + 通知栏进度;
- * 无活动任务(全部完成/失败/暂停)时自动停止,释放前台状态。
+ * Download foreground service: keeps active work alive and publishes notification progress.
+ * Stops and releases foreground state when every task is complete, failed, or paused.
  */
 class DownloadService : Service() {
 
     private val downloadRepo: DownloadRepository by inject()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var collectJob: Job? = null
+
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(newBase.withAppLanguage())
+    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -39,7 +52,10 @@ class DownloadService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        startForeground(NOTIFICATION_ID, buildNotification("准备下载", 0, false))
+        startForeground(
+            NOTIFICATION_ID,
+            buildNotification(getString(SharedR.string.notification_preparing), 0, false),
+        )
         collectJob ?: run {
             collectJob = scope.launch {
                 downloadRepo.tasks.collectLatest { tasks ->
@@ -50,11 +66,11 @@ class DownloadService : Service() {
                         val text = if (active.status == DownloadStatus.DOWNLOADING) {
                             "${active.title} ${active.progress}% · ${formatSpeed(active.speedBps)}"
                         } else {
-                            "${active.title} 等待中..."
+                            getString(SharedR.string.notification_waiting, active.title)
                         }
                         updateNotification(text, active.progress, false)
                     } else {
-                        // 无活动任务:退出前台
+                        // No active work remains: leave the foreground state.
                         stopForeground(STOP_FOREGROUND_REMOVE)
                         stopSelf()
                     }
@@ -68,7 +84,11 @@ class DownloadService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             nm.createNotificationChannel(
-                NotificationChannel(CHANNEL_ID, "下载进度", NotificationManager.IMPORTANCE_LOW)
+                NotificationChannel(
+                    CHANNEL_ID,
+                    getString(SharedR.string.notification_channel_downloads),
+                    NotificationManager.IMPORTANCE_LOW,
+                )
             )
         }
     }
@@ -80,7 +100,7 @@ class DownloadService : Service() {
         )
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.stat_sys_download)
-            .setContentTitle("ClipCove Downloads")
+            .setContentTitle(getString(SharedR.string.notification_title_downloads))
             .setContentText(text)
             .setContentIntent(pi)
             .setOngoing(true)

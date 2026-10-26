@@ -1,4 +1,9 @@
-"""Android App 解析入口：单条抖音作品解析。"""
+"""Douyin resolver entry point exposed to the Android Chaquopy runtime.
+
+SPDX-License-Identifier: GPL-3.0-only
+Copyright (c) 2026 DCRimbaud
+Author: DCRimbaud
+"""
 
 import json
 
@@ -9,6 +14,8 @@ from douyin.parser import ParseError, parse_share_text
 
 
 def _failure(code: str, message: str, detail: str = "") -> str:
+    """Build the structured JSON error envelope consumed by the Kotlin mapper."""
+
     payload = {"code": code, "message": message}
     if detail:
         payload["debug_detail"] = str(detail)[:500]
@@ -16,7 +23,18 @@ def _failure(code: str, message: str, detail: str = "") -> str:
 
 
 def resolve(url: str) -> str:
-    """返回统一 JSON 信封；Kotlin 映射器将其转换为强类型结果。"""
+    """Resolve one Douyin share reference into the normalized JSON envelope.
+
+    Args:
+        url: Raw share text, short URL, full URL, or numeric aweme ID.
+
+    Returns:
+        JSON with normalized media fields on success, or a structured error.
+
+    Raises:
+        This function intentionally converts platform exceptions into the JSON
+        error envelope so the Chaquopy boundary never leaks raw Python types.
+    """
     try:
         aweme_id = parse_share_text(url)
         client = DouyinClient()

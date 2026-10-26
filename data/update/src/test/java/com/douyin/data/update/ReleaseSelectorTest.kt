@@ -1,3 +1,10 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * Copyright (c) 2026 DCRimbaud
+ * Author: DCRimbaud
+ *
+ * Protects semantic release ordering and candidate-selection behavior.
+ */
 package com.douyin.data.update
 
 import org.junit.Assert.assertEquals
@@ -5,8 +12,10 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+/** Protects semantic release selection and prerelease ordering. */
 class ReleaseSelectorTest {
 
+    /** Ensures release selection chooses the highest version above the installed build. */
     @Test
     fun `selects highest release newer than current`() {
         val releases = listOf(
@@ -20,6 +29,7 @@ class ReleaseSelectorTest {
         assertEquals("v1.1.0-rc.1", latest?.tagName)
     }
 
+    /** Ensures prerelease exclusion is respected when requested. */
     @Test
     fun `can exclude prereleases`() {
         val releases = listOf(
@@ -32,11 +42,13 @@ class ReleaseSelectorTest {
         assertEquals("v1.0.3", latest?.tagName)
     }
 
+    /** Ensures no update is selected when the installed version is current. */
     @Test
     fun `returns null when current version is latest`() {
         assertNull(ReleaseSelector.newest(listOf(release("v1.1.0")), "1.1.0"))
     }
 
+    /** Ensures a stable release supersedes its matching prerelease. */
     @Test
     fun `stable version sorts after prerelease with same core`() {
         val stable = SemanticVersion.parse("1.1.0")!!

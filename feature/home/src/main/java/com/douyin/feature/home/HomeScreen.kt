@@ -1,3 +1,10 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * Copyright (c) 2026 DCRimbaud
+ * Author: DCRimbaud
+ *
+ * Coordinates the home input, parse states, results, history, and clipboard suggestion UI.
+ */
 package com.douyin.feature.home
 
 import androidx.compose.animation.AnimatedContent
@@ -54,6 +61,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -77,9 +85,11 @@ import com.douyin.core.designsystem.dyPressable
 import com.douyin.core.model.MediaImage
 import com.douyin.core.model.MediaInfo
 import com.douyin.core.model.ParseFailure
+import com.douyin.core.model.ParseFailureType
+import com.douyin.core.uiresources.R as SharedR
 import com.douyin.data.history.HistoryItem
 
-/** 首页：链接输入、解析状态、结果和最近记录。 */
+/** Home screen for link input, parse states, results, and local history. */
 @Composable
 fun HomeScreen(
     input: String,
@@ -168,8 +178,12 @@ fun HomeScreen(
             }
             item {
                 DySectionHeader(
-                    title = "最近解析",
-                    subtitle = if (history.isEmpty()) "解析过的内容会保存在这里" else "共 ${history.size} 条本地记录",
+                    title = stringResource(SharedR.string.home_recent_title),
+                    subtitle = if (history.isEmpty()) {
+                        stringResource(SharedR.string.home_recent_empty_subtitle)
+                    } else {
+                        stringResource(SharedR.string.home_recent_count, history.size)
+                    },
                     trailing = {
                         DyPill(text = "${history.size}", color = if (history.isEmpty()) DyTextTertiary else DyCyan)
                     },
@@ -184,9 +198,13 @@ fun HomeScreen(
                         ) {
                             DyIconTile(Icons.Filled.History, tint = DyTextSecondary, size = 42.dp)
                             Column(Modifier.weight(1f)) {
-                                Text("还没有解析记录", style = MaterialTheme.typography.titleMedium, color = DyText)
                                 Text(
-                                    "粘贴第一条分享链接，结果会自动保存在本机。",
+                                    stringResource(SharedR.string.home_no_history_title),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = DyText,
+                                )
+                                Text(
+                                    stringResource(SharedR.string.home_no_history_description),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = DyTextSecondary,
                                 )
@@ -262,22 +280,26 @@ private fun HomeHeader() {
         }
         DyPageHeader(
             title = "ClipCove",
-            subtitle = "Keep what you love. Locally.",
-            eyebrow = "LOCAL MEDIA · PRIVATE",
+            subtitle = stringResource(SharedR.string.home_header_subtitle),
+            eyebrow = stringResource(SharedR.string.home_header_eyebrow),
             modifier = Modifier.weight(1f),
             trailing = if (compact) {
                 null
             } else {
-                { DyPill(text = "本地解析", color = DyCyan) }
+                { DyPill(text = stringResource(SharedR.string.home_local_processing), color = DyCyan) }
             },
         )
     }
 }
 
 private sealed interface ParseContentState {
+    /** No loading, error, or result content is visible. */
     data object Idle : ParseContentState
+    /** A parse request is active. */
     data object Loading : ParseContentState
+    /** A typed parse failure should be rendered with retry guidance. */
     data class Failed(val error: ParseFailure) : ParseContentState
+    /** A normalized media result should be rendered with download actions. */
     data class Success(val media: MediaInfo) : ParseContentState
 }
 
@@ -294,9 +316,13 @@ private fun LoadingPanel() {
                 color = DyRed,
             )
             Column(Modifier.weight(1f)) {
-                Text("正在解析", style = MaterialTheme.typography.titleMedium, color = DyText)
                 Text(
-                    "连接平台并提取原始媒体，请稍候…",
+                    stringResource(SharedR.string.home_loading_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = DyText,
+                )
+                Text(
+                    stringResource(SharedR.string.home_loading_description),
                     style = MaterialTheme.typography.bodySmall,
                     color = DyTextSecondary,
                 )
@@ -325,10 +351,14 @@ private fun ParsePanel(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text("分享链接", style = MaterialTheme.typography.titleMedium, color = DyText)
+            Text(
+                stringResource(SharedR.string.home_link_section),
+                style = MaterialTheme.typography.titleMedium,
+                color = DyText,
+            )
             Spacer(Modifier.weight(1f))
-            DyPill("抖音", DyCyan)
-            DyPill("小红书", DyRed)
+            DyPill(stringResource(SharedR.string.platform_douyin), DyCyan)
+            DyPill(stringResource(SharedR.string.platform_xiaohongshu), DyRed)
         }
         Spacer(Modifier.height(12.dp))
         OutlinedTextField(
@@ -337,7 +367,7 @@ private fun ParsePanel(
             modifier = Modifier.fillMaxWidth(),
             placeholder = {
                 Text(
-                    "粘贴分享文案、短链或作品链接",
+                    stringResource(SharedR.string.home_input_placeholder),
                     style = MaterialTheme.typography.bodyMedium,
                     color = DyTextTertiary,
                 )
@@ -348,7 +378,11 @@ private fun ParsePanel(
             trailingIcon = {
                 if (input.isNotEmpty()) {
                     IconButton(onClick = { onInputChange("") }) {
-                        Icon(Icons.Filled.Close, contentDescription = "清空", tint = DyTextSecondary)
+                        Icon(
+                            Icons.Filled.Close,
+                            contentDescription = stringResource(SharedR.string.home_clear_input),
+                            tint = DyTextSecondary,
+                        )
                     }
                 }
             },
@@ -379,7 +413,7 @@ private fun ParsePanel(
             ) {
                 Icon(Icons.Filled.ContentPaste, contentDescription = null, modifier = Modifier.size(17.dp), tint = DyText)
                 Spacer(Modifier.size(7.dp))
-                Text("粘贴", color = DyText)
+                Text(stringResource(SharedR.string.home_paste), color = DyText)
             }
             Button(
                 onClick = onParse,
@@ -403,7 +437,14 @@ private fun ParsePanel(
                     Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(18.dp))
                 }
                 Spacer(Modifier.size(8.dp))
-                Text(if (loading) "解析中" else "开始解析", fontWeight = FontWeight.SemiBold)
+                Text(
+                    if (loading) {
+                        stringResource(SharedR.string.home_parsing)
+                    } else {
+                        stringResource(SharedR.string.home_parse_start)
+                    },
+                    fontWeight = FontWeight.SemiBold,
+                )
             }
         }
     }
@@ -424,14 +465,22 @@ private fun ErrorPanel(error: ParseFailure, onRetry: () -> Unit) {
         ) {
             Icon(Icons.Filled.Link, contentDescription = null, tint = Color(0xFFFF8A9C), modifier = Modifier.size(20.dp))
             Column(Modifier.weight(1f)) {
-                Text("这次没有解析成功", style = MaterialTheme.typography.labelLarge, color = Color(0xFFFF9AAA))
-                Text(error.message, style = MaterialTheme.typography.bodySmall, color = DyTextSecondary)
+                Text(
+                    stringResource(SharedR.string.home_parse_error_title),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = Color(0xFFFF9AAA),
+                )
+                Text(
+                    stringResource(error.type.localizedMessageRes()),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = DyTextSecondary,
+                )
             }
             if (error.isRetryable) {
                 TextButton(onClick = onRetry) {
                     Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(15.dp))
                     Spacer(Modifier.size(4.dp))
-                    Text("重试")
+                    Text(stringResource(SharedR.string.home_retry))
                 }
             }
         }
@@ -458,7 +507,11 @@ private fun ClipboardSuggestion(
         ) {
             DyIconTile(Icons.Filled.ContentPaste, tint = DyCyan, size = 40.dp)
             Column(Modifier.weight(1f)) {
-                Text("检测到分享链接", style = MaterialTheme.typography.labelLarge, color = DyText)
+                Text(
+                    stringResource(SharedR.string.home_clipboard_detected),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = DyText,
+                )
                 Text(
                     link,
                     style = MaterialTheme.typography.bodySmall,
@@ -467,10 +520,28 @@ private fun ClipboardSuggestion(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            TextButton(onClick = onParse) { Text("解析", color = DyRed) }
+            TextButton(onClick = onParse) {
+                Text(stringResource(SharedR.string.home_parse_action), color = DyRed)
+            }
             IconButton(onClick = onDismiss) {
-                Icon(Icons.Filled.Close, contentDescription = "关闭", tint = DyTextSecondary)
+                Icon(
+                    Icons.Filled.Close,
+                    contentDescription = stringResource(SharedR.string.media_close),
+                    tint = DyTextSecondary,
+                )
             }
         }
     }
+}
+
+
+/** Maps stable parser failure categories to localized UI copy. */
+private fun ParseFailureType.localizedMessageRes(): Int = when (this) {
+    ParseFailureType.INVALID_LINK -> SharedR.string.parse_error_invalid_link
+    ParseFailureType.UNSUPPORTED_PLATFORM -> SharedR.string.parse_error_unsupported_platform
+    ParseFailureType.NETWORK -> SharedR.string.parse_error_network
+    ParseFailureType.RISK_CONTROL -> SharedR.string.parse_error_risk_control
+    ParseFailureType.CONTENT_UNAVAILABLE -> SharedR.string.parse_error_content_unavailable
+    ParseFailureType.RESPONSE_CHANGED -> SharedR.string.parse_error_response_changed
+    ParseFailureType.UNKNOWN -> SharedR.string.parse_error_unknown
 }

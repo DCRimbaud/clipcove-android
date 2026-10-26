@@ -21,6 +21,7 @@ rootProject.name = "ClipCove"
 include(":app")
 include(":core:model")
 include(":core:designsystem")
+include(":core:ui-resources")
 include(":core:common")
 include(":data:douyin")
 include(":data:download")

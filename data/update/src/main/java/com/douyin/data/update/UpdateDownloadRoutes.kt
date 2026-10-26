@@ -1,5 +1,13 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * Copyright (c) 2026 DCRimbaud
+ * Author: DCRimbaud
+ *
+ * Defines approved update asset and GitHub API mirror routes.
+ */
 package com.douyin.data.update
 
+/** Allowlisted mirror routes for GitHub release metadata and APK assets. */
 internal object UpdateDownloadRoutes {
     private val binaryMirrorPrefixes = listOf(
         "https://gh.llkk.cc/",
@@ -15,6 +23,13 @@ internal object UpdateDownloadRoutes {
         "https://gh.idayer.com/",
     )
 
+    /**
+     * Builds direct-first candidates without reusing binary proxies for API calls.
+     *
+     * @param originalUrl Trusted GitHub asset or API URL from the release payload.
+     * @param allowMirrors Whether approved mirror routes are enabled.
+     * @return A deduplicated route list; non-GitHub hosts never receive prefixes.
+     */
     fun candidates(originalUrl: String, allowMirrors: Boolean): List<String> {
         if (!allowMirrors) return listOf(originalUrl)
 

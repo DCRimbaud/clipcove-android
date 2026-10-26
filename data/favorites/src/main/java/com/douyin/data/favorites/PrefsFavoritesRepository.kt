@@ -1,3 +1,10 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * Copyright (c) 2026 DCRimbaud
+ * Author: DCRimbaud
+ *
+ * Stores favorites in app-private SharedPreferences with corruption tolerance and merge semantics.
+ */
 package com.douyin.data.favorites
 
 import android.content.Context
@@ -5,7 +12,7 @@ import com.douyin.core.model.MediaPlatform
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** SharedPreferences 实现 */
+/** SharedPreferences-backed repository implementation. */
 class PrefsFavoritesRepository(context: Context) : FavoritesRepository {
 
     private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -28,7 +35,7 @@ class PrefsFavoritesRepository(context: Context) : FavoritesRepository {
                 )
             }
         } catch (e: Exception) {
-            // 数据损坏时容错,不崩溃
+            // Corrupt persisted data is ignored rather than crashing the app.
             emptyList()
         }
     }

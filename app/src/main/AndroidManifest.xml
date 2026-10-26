@@ -14,8 +14,9 @@
 
     <application
         android:name=".DouyinApp"
-        android:label="ClipCove"
+        android:label="@string/app_name"
         android:icon="@mipmap/ic_launcher"
+        android:localeConfig="@xml/locales_config"
         android:theme="@style/Theme.ClipCove"
         android:usesCleartextTraffic="false">
         <activity

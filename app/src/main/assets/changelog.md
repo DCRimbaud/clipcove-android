@@ -1,8 +1,9 @@
-# 更新日志
+# Changelog
 
-## 1.2.1
+## 1.3.0
 
-- 更新检查与安装包下载支持更多国内可用线路。
-- App 会并发探测线路，自动跳过无法连接或卡住的 GitHub 直连。
-- 下载进度会显示正在选择线路，不再停留在 0%。
-- 更新包仍会严格校验 SHA-256、版本和应用签名。
+- Douyin and Xiaohongshu results now include full captions, creator handles, topics, locations, play/recommend counters, soundtrack authors, and cover images.
+- Images now have explicit actions for single-image download, download all, Live Photo download, soundtrack merge, cover download, and copying the original link.
+- Music rows show the soundtrack author and duration; video candidates retain resolution and file size.
+- The launcher icon now matches the Home gradient C mark on modern and legacy Android versions.
+- Added expandable captions, a complete post-details panel, and a full English / Simplified Chinese interface.

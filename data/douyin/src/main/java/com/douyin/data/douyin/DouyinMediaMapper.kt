@@ -1,3 +1,10 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * Copyright (c) 2026 DCRimbaud
+ * Author: DCRimbaud
+ *
+ * Maps untrusted Douyin JSON into normalized media metadata, image assets, and video candidates.
+ */
 package com.douyin.data.douyin
 
 import com.douyin.core.model.MediaImage
@@ -12,9 +19,15 @@ import com.douyin.core.model.VideoSourceKind
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** 将内嵌 Python 引擎的 JSON 输出收敛为强类型领域模型。 */
+/** Maps untrusted Python JSON into the typed media contract and structured failures. */
 object DouyinMediaMapper {
 
+    /**
+     * Converts the Chaquopy JSON envelope into a typed parse result.
+     *
+     * @param raw Untrusted JSON returned by the Python resolver.
+     * @return A typed success or failure; malformed JSON never escapes this boundary.
+     */
     fun fromPythonJson(raw: String): ParseResult {
         val root = try {
             JSONObject(raw)
@@ -72,11 +85,25 @@ object DouyinMediaMapper {
                 commentCount = stats?.optLong("comment_count")?.coerceAtLeast(0) ?: 0L,
                 collectCount = stats?.optLong("collect_count")?.coerceAtLeast(0) ?: 0L,
                 shareCount = stats?.optLong("share_count")?.coerceAtLeast(0) ?: 0L,
+                playCount = stats?.optLong("play_count")?.coerceAtLeast(0) ?: 0L,
+                recommendCount = stats?.optLong("recommend_count")?.coerceAtLeast(0) ?: 0L,
             ),
+            description = root.optString("description").ifBlank { root.optString("title") },
+            authorId = root.optString("author_id"),
+            authorHandle = root.optString("author_handle"),
+            authorAvatarUrl = secureUrl(root.optString("author_avatar")),
+            hashtags = root.optJSONArray("hashtags").toStringList(),
+            location = root.optString("location"),
+            shareUrl = secureUrl(root.optString("share_url")),
             videoUrl = videoUrl,
             videoCandidates = candidates,
             musicUrl = secureUrl(root.optString("music")),
             musicTitle = root.optString("music_title"),
+            musicAuthor = root.optString("music_author"),
+            musicDurationMs = root.optLong("music_duration")
+                .coerceAtLeast(0)
+                .let { if (it in 1..999) it * 1000 else it },
+            musicCoverUrl = secureUrl(root.optString("music_cover")),
             images = images,
         )
         return ParseResult.Success(media)
@@ -137,6 +164,7 @@ object DouyinMediaMapper {
                         sizeBytes = sequenceOf(
                             item.optLong("size"),
                             item.optLong("file_size"),
+                            item.optLong("data_size"),
                         ).firstOrNull { it > 0 } ?: 0L,
                         sourceKind = VideoSourceKind.TRANSCODED,
                     )
@@ -163,6 +191,16 @@ object DouyinMediaMapper {
                         height = item.optInt("height").coerceAtLeast(0),
                     )
                 )
+            }
+        }
+    }
+
+    private fun JSONArray?.toStringList(): List<String> {
+        if (this == null) return emptyList()
+        return buildList {
+            for (index in 0 until length()) {
+                val value = optString(index).trim()
+                if (value.isNotEmpty() && value !in this) add(value)
             }
         }
     }

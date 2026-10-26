@@ -1,3 +1,10 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * Copyright (c) 2026 DCRimbaud
+ * Author: DCRimbaud
+ *
+ * Downloads, probes, verifies, and opens Android APK updates without weakening integrity checks.
+ */
 package com.douyin.data.update
 
 import android.content.Context
@@ -407,6 +414,7 @@ class AndroidUpdateInstaller(
         const val TAG = "ClipCoveUpdate"
         const val USER_AGENT = "ClipCove-Android-Updater"
 
+        /** Creates the long-lived client used for checksum and APK streaming. */
         fun defaultClient(): OkHttpClient = OkHttpClient.Builder()
             .connectTimeout(12, TimeUnit.SECONDS)
             .readTimeout(45, TimeUnit.SECONDS)
@@ -416,4 +424,5 @@ class AndroidUpdateInstaller(
     }
 }
 
+/** User-actionable update failure exposed to the settings state holder. */
 class UpdateException(message: String) : IOException(message)

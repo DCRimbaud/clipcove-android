@@ -6,6 +6,7 @@ Run before every pull request and release:
 
 ```powershell
 .\gradlew.bat lintDebug testDebugUnitTest assembleDebug
+python tools\check_comments.py
 ```
 
 A parser change should include a minimal sanitized fixture. A persistence change should include backward-compatibility coverage. A UI change should include a screenshot with tokens and personal data removed.
@@ -21,6 +22,7 @@ A parser change should include a minimal sanitized fixture. A persistence change
 - Logs and exported diagnostics are sanitized.
 - Accessibility labels exist for non-decorative icons.
 - Unit tests and lint pass.
+- First-party comments pass the SPDX, English-only, and public-contract checker.
 - New dependencies have a compatible license and are reflected in third-party notices when required.
 
 ## Third-Party Code Policy

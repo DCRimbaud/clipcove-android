@@ -1,18 +1,28 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * Copyright (c) 2026 DCRimbaud
+ * Author: DCRimbaud
+ *
+ * Protects direct-only and mirror-route selection behavior.
+ */
 package com.douyin.data.update
 
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
+/** Protects update route allowlisting and direct-only behavior. */
 class UpdateDownloadRoutesTest {
 
     private val githubUrl =
         "https://github.com/DCRimbaud/clipcove-android/releases/download/v1.0.0/app.apk"
 
+    /** Ensures direct-only mode never adds mirror routes. */
     @Test
     fun `direct-only mode returns only GitHub URL`() {
         assertEquals(listOf(githubUrl), UpdateDownloadRoutes.candidates(githubUrl, false))
     }
 
+    /** Ensures automatic mode applies only approved binary mirror routes in order. */
     @Test
     fun `automatic mode puts GitHub first then mirrors`() {
         val routes = UpdateDownloadRoutes.candidates(githubUrl, true)
@@ -28,6 +38,7 @@ class UpdateDownloadRoutesTest {
         assertEquals(githubUrl, routes[7].removePrefix("https://ghproxy.net/"))
     }
 
+    /** Ensures API requests use only API-compatible proxy routes. */
     @Test
     fun `GitHub API gets dedicated API mirror candidates`() {
         val apiUrl = "https://api.github.com/repos/DCRimbaud/clipcove-android/releases?per_page=30"
@@ -39,6 +50,7 @@ class UpdateDownloadRoutesTest {
         assertEquals(apiUrl, routes[2].removePrefix("https://gh.idayer.com/"))
     }
 
+    /** Ensures arbitrary download hosts cannot receive GitHub proxy prefixes. */
     @Test
     fun `non-GitHub URL is never sent through mirrors`() {
         val custom = "https://downloads.example.com/app.apk"

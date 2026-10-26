@@ -1,3 +1,10 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * Copyright (c) 2026 DCRimbaud
+ * Author: DCRimbaud
+ *
+ * Protects Douyin mapping invariants for media, metadata, URLs, and structured failures.
+ */
 package com.douyin.data.douyin
 
 import com.douyin.core.model.MediaPlatform
@@ -9,8 +16,10 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+/** Protects Douyin media, metadata, URL, and failure mapping invariants. */
 class DouyinMediaMapperTest {
 
+    /** Ensures video metadata and source candidates map into the normalized media contract. */
     @Test
     fun `maps video result to typed media`() {
         val result = DouyinMediaMapper.fromPythonJson(
@@ -18,15 +27,25 @@ class DouyinMediaMapperTest {
             {
               "aweme_id":"7345492945006595379",
               "title":"测试视频",
+              "description":"完整作品说明",
               "author":"作者",
+              "author_id":"user-1",
+              "author_handle":"clipcove",
+              "author_avatar":"https://example.com/avatar.jpg",
+              "hashtags":["测试","视频"],
+              "location":"上海",
+              "share_url":"https://www.douyin.com/video/7345492945006595379",
               "cover":"https://example.com/cover.jpg",
               "create_time":1700000000,
               "duration":12500,
-              "stats":{"digg_count":10,"comment_count":2,"collect_count":3,"share_count":4},
+              "stats":{"digg_count":10,"comment_count":2,"collect_count":3,"share_count":4,"play_count":1000,"recommend_count":20},
               "play_url":"https://example.com/video.mp4",
-              "play_urls":[{"label":"bitrate_0","url":"https://example.com/video.mp4","bitrate":2048}],
+              "play_urls":[{"label":"bitrate_0","url":"https://example.com/video.mp4","bitrate":2048,"width":1080,"height":1920,"size":4096}],
               "music":"https://example.com/music.mp3",
               "music_title":"原声",
+              "music_author":"音乐人",
+              "music_duration":44,
+              "music_cover":"https://example.com/music.jpg",
               "images":[]
             }
             """.trimIndent()
@@ -41,9 +60,21 @@ class DouyinMediaMapperTest {
         assertEquals(VideoSourceKind.TRANSCODED, media.videoCandidates.single().sourceKind)
         assertFalse(media.videoCandidates.single().watermarkRisk)
         assertEquals(10L, media.stats.diggCount)
+        assertEquals(1_000L, media.stats.playCount)
+        assertEquals("完整作品说明", media.description)
+        assertEquals("clipcove", media.authorHandle)
+        assertEquals(listOf("测试", "视频"), media.hashtags)
+        assertEquals("上海", media.location)
+        assertEquals("https://www.douyin.com/video/7345492945006595379", media.shareUrl)
+        assertEquals("音乐人", media.musicAuthor)
+        assertEquals(44_000L, media.musicDurationMs)
+        assertEquals(1080, media.videoCandidates.single().width)
+        assertEquals(1920, media.videoCandidates.single().height)
+        assertEquals(4096L, media.videoCandidates.single().sizeBytes)
         assertTrue(media.hasVideo)
     }
 
+    /** Ensures legacy play URLs remain downloadable through a typed candidate. */
     @Test
     fun `creates a typed candidate when only play url is present`() {
         val result = DouyinMediaMapper.fromPythonJson(
@@ -63,6 +94,7 @@ class DouyinMediaMapperTest {
         assertEquals(VideoSourceKind.TRANSCODED, media.videoCandidates.single().sourceKind)
     }
 
+    /** Ensures platform media URLs never remain cleartext. */
     @Test
     fun `upgrades insecure platform URLs to HTTPS`() {
         val result = DouyinMediaMapper.fromPythonJson(
@@ -87,6 +119,7 @@ class DouyinMediaMapperTest {
         assertEquals("https://example.com/image.jpg", media.images.single().url)
     }
 
+    /** Ensures gallery images use an accessible URL and preserve the Live Photo stream. */
     @Test
     fun `maps image note and live photo`() {
         val result = DouyinMediaMapper.fromPythonJson(
@@ -114,6 +147,7 @@ class DouyinMediaMapperTest {
         assertTrue(media.hasImages)
     }
 
+    /** Ensures structured risk-control payloads become typed non-retryable failures. */
     @Test
     fun `maps structured risk control error`() {
         val result = DouyinMediaMapper.fromPythonJson(
@@ -126,6 +160,7 @@ class DouyinMediaMapperTest {
         assertEquals(false, failure.isRetryable)
     }
 
+    /** Ensures legacy error strings still classify as invalid-link failures. */
     @Test
     fun `supports legacy string errors`() {
         val result = DouyinMediaMapper.fromPythonJson("""{"error":"链接无效: 未找到链接"}""")
@@ -134,6 +169,7 @@ class DouyinMediaMapperTest {
         assertEquals(ParseFailureType.INVALID_LINK, failure.type)
     }
 
+    /** Ensures malformed parser output becomes a retryable response-change failure. */
     @Test
     fun `rejects malformed result`() {
         val result = DouyinMediaMapper.fromPythonJson("not-json")

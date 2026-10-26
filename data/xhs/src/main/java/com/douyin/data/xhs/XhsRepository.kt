@@ -1,8 +1,15 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * Copyright (c) 2026 DCRimbaud
+ * Author: DCRimbaud
+ *
+ * Defines the Xiaohongshu page-fetching port used by the feature layer.
+ */
 package com.douyin.data.xhs
 
 import com.douyin.core.model.ParseResult
 
-/** 小红书解析端口。当前实现为官方笔记页 SSR，第三方解析接口不再参与主链路。 */
+/** Xiaohongshu fetch port backed by the official note-page SSR payload. */
 interface XhsRepository {
     suspend fun resolve(url: String): ParseResult
 }
