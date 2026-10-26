@@ -1,4 +1,9 @@
-"""小红书页面抓取入口：网络请求在 Python 栈完成，SSR 解析仍由 Kotlin 负责。"""
+"""Network-only Xiaohongshu page fetcher used by the Kotlin SSR parser.
+
+SPDX-License-Identifier: GPL-3.0-only
+Copyright (c) 2026 DCRimbaud
+Author: DCRimbaud
+"""
 
 from __future__ import annotations
 
@@ -16,6 +21,7 @@ ALLOWED_SUFFIXES = ("xiaohongshu.com", "xhslink.com", "xhslink.cn")
 
 
 def _failure(code: str, message: str, detail: str = "") -> str:
+    """Build a bounded structured error payload for the Kotlin parser."""
     payload = {"code": code, "message": message}
     if detail:
         payload["debug_detail"] = str(detail)[:500]
@@ -23,17 +29,26 @@ def _failure(code: str, message: str, detail: str = "") -> str:
 
 
 def _allowed(url: str) -> bool:
+    """Return whether a redirect target belongs to an official XHS domain."""
     host = (urlparse(url).hostname or "").lower()
     return any(host == suffix or host.endswith("." + suffix) for suffix in ALLOWED_SUFFIXES)
 
 
 def _has_note_payload(page: str) -> bool:
-    """桌面 SSR 和移动端 SSR 使用不同的数据根节点。"""
+    """Detect either desktop or mobile Xiaohongshu SSR payload roots."""
     return "noteDetailMap" in page or ("noteData" in page and "noteId" in page)
 
 
 def fetch_page(url: str) -> str:
-    """返回 {"html","final_url"} 或结构化错误。"""
+    """Fetch an official Xiaohongshu note page for Kotlin SSR parsing.
+
+    Args:
+        url: Official note URL or an allowed Xiaohongshu short link.
+
+    Returns:
+        JSON containing ``html`` and ``final_url`` on success, or a structured
+        error envelope when the link is rejected or the network request fails.
+    """
     try:
         session = requests.Session()
         session.headers.update(
@@ -49,7 +64,7 @@ def fetch_page(url: str) -> str:
         if not _allowed(response.url):
             return _failure("INVALID_LINK", "小红书短链跳转到了非官方域名", response.url[:200])
 
-        # 部分网络环境首次请求只返回通用页，建立首页会话后再取一次。
+        # Some networks return a generic shell first; establish a home session and retry once.
         if response.status_code == 200 and not _has_note_payload(response.text):
             session.get(HOME_URL, timeout=20, allow_redirects=True)
             response = session.get(url, timeout=20, allow_redirects=True)

@@ -1,3 +1,10 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * Copyright (c) 2026 DCRimbaud
+ * Author: DCRimbaud
+ *
+ * Coordinates parsing, platform detection, history, favorites, sharing, and download enqueueing.
+ */
 package com.douyin.feature.home
 
 import android.app.Application
@@ -15,6 +22,7 @@ import com.douyin.core.model.MediaInfo
 import com.douyin.core.model.ParseFailure
 import com.douyin.core.model.ParseFailureType
 import com.douyin.core.model.ParseResult
+import com.douyin.core.uiresources.R as SharedR
 import com.douyin.data.douyin.DouyinRepository
 import com.douyin.data.download.DownloadRepository
 import com.douyin.data.favorites.FavoriteItem
@@ -23,13 +31,14 @@ import com.douyin.data.history.HistoryItem
 import com.douyin.data.history.HistoryRepository
 import com.douyin.data.merger.VideoMerger
 import com.douyin.data.settings.SettingsRepository
+import com.douyin.data.settings.withAppLanguage
 import com.douyin.data.xhs.XhsRepository
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
-/** 首页协调器：把平台解析、历史、收藏和下载入口收敛在一个明确状态机中。 */
+/** Home coordinator that owns platform parsing, history, favorites, sharing, and download enqueueing. */
 class HomeViewModel(
     private val douyinRepo: DouyinRepository,
     private val xhsRepo: XhsRepository,
@@ -69,6 +78,7 @@ class HomeViewModel(
         _history.value = historyRepo.load()
     }
 
+    /** Updates the editable link text and clears a stale parse error. */
     fun onInputChange(value: String) {
         _input.value = value
         if (_error.value != null) _error.value = null
@@ -82,6 +92,7 @@ class HomeViewModel(
         }
     }
 
+    /** Fills an empty input from a shared intent only when the text looks supported. */
     fun acceptIncoming(text: String?) {
         val clean = text?.trim()?.takeIf { it.length in 1..MAX_INPUT_LENGTH } ?: return
         if (looksLikeSupportedLink(clean) && _input.value.isBlank()) {
@@ -89,6 +100,7 @@ class HomeViewModel(
         }
     }
 
+    /** Reads the current clipboard on the UI caller and copies its text into the input. */
     fun pasteClipboard() {
         val app = getApplication<Application>()
         val clipboard = app.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -99,6 +111,7 @@ class HomeViewModel(
         }
     }
 
+    /** Offers a supported clipboard link without starting network work. */
     fun checkClipboard() {
         val app = getApplication<Application>()
         val clipboard = app.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -113,6 +126,7 @@ class HomeViewModel(
         }
     }
 
+    /** Accepts the clipboard suggestion, closes it, and starts parsing. */
     fun parseClipboardSuggestion() {
         val link = _clipboardSuggestion.value ?: return
         _input.value = link
@@ -120,10 +134,12 @@ class HomeViewModel(
         parse()
     }
 
+    /** Hides the clipboard suggestion without changing the input. */
     fun dismissClipboardSuggestion() {
         _clipboardSuggestion.value = null
     }
 
+    /** Adds or removes the current result from local favorites and updates observable state. */
     fun toggleFavorite() {
         val media = _result.value ?: return
         if (favoritesRepo.isFavorite(media.id)) {
@@ -144,6 +160,12 @@ class HomeViewModel(
         }
     }
 
+    /**
+     * Consumes a share intent exactly once and optionally starts parsing.
+     *
+     * Side effects: updates input, may launch a parse coroutine, and advances
+     * intent consumption so a configuration recomposition cannot duplicate work.
+     */
     fun handleIntent(intent: Intent?) {
         if (intent?.action != Intent.ACTION_SEND || intent.type?.startsWith("text/") != true) return
         val clean = intent.getStringExtra(Intent.EXTRA_TEXT)
@@ -157,6 +179,13 @@ class HomeViewModel(
         if (settingsRepo.autoParseSharedLinks.value) parse()
     }
 
+    /**
+     * Parses the current input on the IO dispatcher and publishes UI state.
+     *
+     * On success the result, favorite status, and local history are refreshed.
+     * On failure the previous result and favorite state are cleared. Concurrent
+     * parses are ignored while loading is true.
+     */
     fun parse() {
         val originalInput = _input.value.trim()
         if (originalInput.isEmpty()) {
@@ -237,34 +266,50 @@ class HomeViewModel(
         }
     }
 
+    /** Enqueues one non-empty media URL and reports acceptance with a toast. */
     fun enqueueDownload(title: String, filename: String, url: String) {
         downloadRepo.enqueue(title, filename, url)
-        Toast.makeText(getApplication(), "已加入下载：$title", Toast.LENGTH_SHORT).show()
+        Toast.makeText(
+            getApplication(),
+            localizedContext().getString(SharedR.string.home_download_added, title),
+            Toast.LENGTH_SHORT,
+        ).show()
     }
 
+    /** Enqueues every gallery image that has a usable preferred URL. */
     fun enqueueGallery(title: String, mediaId: String, images: List<MediaImage>) {
         val downloadable = images.filter { it.preferredUrl.isNotBlank() }
         downloadable.forEachIndexed { index, image ->
             downloadRepo.enqueue(
-                title = "${title}_原图${index + 1}",
-                filename = "${mediaId}_${index + 1}_原图.jpg",
+                title = "${title}_image${index + 1}",
+                filename = "${mediaId}_${index + 1}_image.jpg",
                 url = image.preferredUrl,
             )
         }
         if (downloadable.isNotEmpty()) {
             Toast.makeText(
                 getApplication(),
-                "已加入 ${downloadable.size} 张原图下载",
+                localizedContext().getString(SharedR.string.home_gallery_added, downloadable.size),
                 Toast.LENGTH_SHORT,
             ).show()
         }
     }
 
+    /** Starts an FFmpeg merge and reports the terminal result on the caller's UI surface. */
     fun mergeVideo(videoUrl: String, audioUrl: String, filename: String) {
-        Toast.makeText(getApplication(), "开始合成：$filename", Toast.LENGTH_SHORT).show()
-        merger.merge(getApplication(), videoUrl, audioUrl, filename) { success, message ->
-            val text = if (success) "$message：$filename" else message
-            Toast.makeText(getApplication(), text, Toast.LENGTH_LONG).show()
+        val context = localizedContext()
+        Toast.makeText(
+            context,
+            context.getString(SharedR.string.home_merge_started, filename),
+            Toast.LENGTH_SHORT,
+        ).show()
+        merger.merge(getApplication(), videoUrl, audioUrl, filename) { success, _ ->
+            val text = if (success) {
+                context.getString(SharedR.string.home_merge_complete, filename)
+            } else {
+                context.getString(SharedR.string.home_merge_failed)
+            }
+            Toast.makeText(context, text, Toast.LENGTH_LONG).show()
         }
     }
 
@@ -288,6 +333,9 @@ class HomeViewModel(
         )
         _history.value = historyRepo.load()
     }
+
+    /** Returns a context whose resources follow the persisted app-language choice. */
+    private fun localizedContext(): Context = getApplication<Application>().withAppLanguage()
 
     private fun detectPlatform(input: String): SourcePlatform {
         val normalized = input.lowercase()

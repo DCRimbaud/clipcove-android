@@ -1,3 +1,10 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * Copyright (c) 2026 DCRimbaud
+ * Author: DCRimbaud
+ *
+ * Protects diagnostic redaction invariants for secrets, links, and personal identifiers.
+ */
 package com.douyin.core.common.diagnostics
 
 import org.junit.Assert.assertEquals
@@ -5,8 +12,10 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+/** Protects diagnostic redaction and bounded-text invariants. */
 class DiagnosticSanitizerTest {
 
+    /** Ensures sensitive tokens and personal identifiers never survive diagnostic export. */
     @Test
     fun `redacts credentials and personal identifiers`() {
         val raw = "GET https://example.com/a?xsec_token=secret&xsec_source=pc " +
@@ -26,6 +35,7 @@ class DiagnosticSanitizerTest {
         assertTrue(clean.contains("[email]"))
     }
 
+    /** Ensures diagnostic text is normalized and bounded before storage. */
     @Test
     fun `collapses whitespace and enforces a length limit`() {
         val clean = DiagnosticSanitizer.sanitize("a\n\tb   c", maxLength = 5)

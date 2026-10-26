@@ -1,4 +1,11 @@
-﻿package com.douyin.data.download
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * Copyright (c) 2026 DCRimbaud
+ * Author: DCRimbaud
+ *
+ * Owns the resumable download state machine, concurrency limits, retries, persistence, and file cleanup.
+ */
+package com.douyin.data.download
 
 import android.content.Context
 import android.util.Log
@@ -22,12 +29,12 @@ import java.util.concurrent.TimeUnit
 import kotlin.random.Random
 
 /**
- * App 内下载管理器(自研增强版):
- * - OkHttp 流式下载,Range 断点续传(.part 文件,完成后 rename)
- * - 暂停/继续/取消:暂停保留断点文件,恢复时带 Range 续传
- * - 失败自动重试:指数退避 + 随机抖动,仅重试 IO/5xx,4xx 不重试(签名 URL 过期无意义)
- * - 实时速度:3 秒滑动窗口平均
- * - 全局并发上限 3,任务状态通过 StateFlow 暴露,UI 订阅自动刷新
+ * App-private download manager:
+ * - Streams through OkHttp and resumes with Range requests using a .part file.
+ * - Pause/resume/cancel: pause preserves the part file, while resume continues with Range.
+ * - Retries only IO/5xx failures with exponential backoff and jitter; 4xx responses are terminal because signed URLs may be expired.
+ * - Reports a three-second sliding-window transfer speed.
+ * - Limits global concurrency to three and exposes task state through StateFlow.
  */
 class AndroidDownloadRepository : DownloadRepository {
 
@@ -45,10 +52,10 @@ class AndroidDownloadRepository : DownloadRepository {
     private val _tasks = MutableStateFlow<List<DownloadTask>>(emptyList())
     override val tasks: StateFlow<List<DownloadTask>> = _tasks
 
-    /** 进行中的 OkHttp Call:暂停/取消时 cancel 中断阻塞读 */
+    /** Active OkHttp calls, cancelled to interrupt blocking reads during pause or removal. */
     private val runningCalls = ConcurrentHashMap<Long, Call>()
     private val speedMeters = ConcurrentHashMap<Long, SpeedMeter>()
-    /** 活跃任务对象(下载线程持引用):UI 拿到的可能是 copy 副本,操作前按 id 找回原对象 */
+    /** Live task objects owned by download workers; UI snapshots are resolved by id before mutation. */
     private val liveTasks = ConcurrentHashMap<Long, DownloadTask>()
     private val nextId = java.util.concurrent.atomic.AtomicLong(1)
 
@@ -59,12 +66,12 @@ class AndroidDownloadRepository : DownloadRepository {
         }
     }
 
-    // ===== 任务持久化 =====
+    // Task persistence
 
     private fun persistFile(): File =
         File(appContext!!.filesDir, "downloads" + File.separator + "tasks.json")
 
-    /** 每次任务变更后持久化(IO 线程,量小) */
+    /** Persists the small task snapshot after each state change. */
     private fun persist() {
         val tasks = _tasks.value
         if (tasks.isEmpty()) {
@@ -79,7 +86,7 @@ class AndroidDownloadRepository : DownloadRepository {
         }
     }
 
-    /** 启动时恢复任务列表:下载中/排队 → 暂停(等用户点继续,.part 续传);完成态校验文件存在 */
+    /** Restores persisted tasks; unfinished work becomes paused and completed files are validated before reuse. */
     private fun loadPersistedTasks() {
         val f = persistFile()
         if (!f.exists()) return
@@ -95,7 +102,7 @@ class AndroidDownloadRepository : DownloadRepository {
         val keep = restored.filter { t ->
             when (t.status) {
                 DownloadStatus.DONE -> {
-                    // 完成态:文件必须还在
+                    // Completed tasks remain restorable only while their file still exists.
                     val f0 = if (t.filePath.isNotEmpty()) File(t.filePath) else File(dir, t.filename)
                     f0.exists() && f0.length() > 0
                 }
@@ -104,22 +111,22 @@ class AndroidDownloadRepository : DownloadRepository {
             }
         }
         if (keep.isEmpty()) return
-        // 未完成任务(下载线程已随进程结束)统一恢复为暂停,交给用户决定继续/删除;
-        // 已完成任务保持 DONE(文件校验通过),仅恢复列表供打开/另存/删除
+        // Unfinished tasks lost their worker with the process, so restore them as paused for an explicit user decision.
+        // Completed tasks stay DONE after file validation and remain actionable from the list.
         keep.forEach { t ->
             when (t.status) {
                 DownloadStatus.PAUSED, DownloadStatus.FAILED -> {
                     t.paused = true
                     t.status = DownloadStatus.PAUSED
                     liveTasks[t.id] = t
-                    // 断点续传:.part 文件长度作为已下载量
+                    // Resume accounting uses the persisted part-file length.
                     val part = File(dir, t.filename + ".part")
                     if (part.exists()) {
                         t.downloadedBytes = part.length()
                     }
                 }
                 DownloadStatus.DONE -> {
-                    // 完成态:文件校验通过,恢复为完成;放入 liveTasks 以便删除时清理文件
+                    // Restore completed tasks into the live map so later deletion can clean the backing file.
                     t.paused = false
                     t.speedBps = 0
                     liveTasks[t.id] = t
@@ -137,8 +144,8 @@ class AndroidDownloadRepository : DownloadRepository {
         val task = DownloadTask(nextId.getAndIncrement(), title, filename, url)
         liveTasks[task.id] = task
         synchronized(this) {
-            // 列表存快照副本(与下载线程对象分离),否则 update 时 copy 出的
-            // 新对象与列表元素字段恒等,List.equals 判定相等,StateFlow 永不 emit
+            // Store snapshots separately from worker objects; otherwise copied updates can compare equal and suppress StateFlow emissions.
+            // Snapshot identity is also required for deterministic list equality.
             _tasks.value = listOf(task.copy()) + _tasks.value
         }
         persist()
@@ -169,7 +176,7 @@ class AndroidDownloadRepository : DownloadRepository {
     override fun remove(task: DownloadTask) {
         val t = liveTasks.remove(task.id)
         if (t == null) {
-            // 未在活跃映射(已完成/已恢复):仍按任务信息清理文件(修复残留 bug)
+            // Tasks missing from the live map still clean their known files by persisted metadata.
             cleanupFiles(task)
             synchronized(this) {
                 _tasks.value = _tasks.value.filter { it.id != task.id }
@@ -188,7 +195,7 @@ class AndroidDownloadRepository : DownloadRepository {
         persist()
     }
 
-    // ===== 下载主循环 =====
+    // Download state machine
 
     private suspend fun downloadLoop(task: DownloadTask) {
         if (task.cancelled) return
@@ -224,7 +231,7 @@ class AndroidDownloadRepository : DownloadRepository {
                 }
             }
         } finally {
-            // 完成/失败/取消:移出活跃映射;暂停时保留(恢复下载仍要找到原对象)
+            // Remove completed, failed, and cancelled workers from the live map; retain paused workers for resume.
             if (task.status != DownloadStatus.PAUSED && liveTasks[task.id] === task) {
                 liveTasks.remove(task.id)
             }
@@ -232,7 +239,7 @@ class AndroidDownloadRepository : DownloadRepository {
         }
     }
 
-    /** 单次流式下载,写入 .part;抛异常表示失败(由上层决定重试) */
+    /** Performs one streaming attempt into the part file; exceptions are classified by the retry loop. */
     private fun streamDownload(task: DownloadTask) {
         val dir = File(appContext!!.filesDir, "downloads").apply { mkdirs() }
         val partFile = File(dir, task.filename + ".part")
@@ -249,14 +256,14 @@ class AndroidDownloadRepository : DownloadRepository {
             call.execute().use { resp ->
                 val code = resp.code
                 if (code == 416) {
-                    // 已完整(继续请求超范围):直接完成
+                    // A 416 response means the persisted file is already complete when its length matches the expected size.
                     return
                 }
                 if (code !in 200..299) throw IOException("HTTP $code")
                 val total = parseTotal(resp, startBytes)
                 task.totalBytes = total
                 if (code != 206) {
-                    // 服务器忽略 Range(200):从头重写
+                    // If the server ignores Range and returns 200, reset the part file before copying.
                     partFile.delete()
                 }
                 task.downloadedBytes = if (code == 206) startBytes else 0
@@ -354,9 +361,9 @@ class AndroidDownloadRepository : DownloadRepository {
         }
     }
 
-    // ===== 工具 =====
+    // Utilities
 
-    /** 解析 Content-Range / Content-Length 得到总大小 */
+    /** Parses total size from Content-Range or Content-Length. */
     private fun parseTotal(resp: okhttp3.Response, fallback: Long): Long {
         val cr = resp.header("Content-Range")
         if (cr != null) {
@@ -368,7 +375,7 @@ class AndroidDownloadRepository : DownloadRepository {
         return resp.header("Content-Length")?.toLongOrNull() ?: fallback
     }
 
-    /** 仅 IO/网络/5xx 可重试;4xx(尤其 403/404 签名过期)不重试 */
+    /** Only IO, network, and 5xx failures are retryable; signed 4xx failures are terminal. */
     private fun retryable(e: Exception): Boolean {
         if (e is IOException) return true
         val msg = e.message ?: ""
@@ -378,13 +385,13 @@ class AndroidDownloadRepository : DownloadRepository {
         return false
     }
 
-    /** 指数退避:1s → 2s → 4s → ... 上限 30s,加随机抖动 */
+    /** Exponential backoff with jitter, capped at thirty seconds. */
     private fun backoffMillis(attempt: Int): Long {
         val exp = (1000L shl (attempt - 1)).coerceAtMost(30_000L)
         return exp / 2 + Random.nextLong(exp / 2, exp + 1)
     }
 
-    /** 按 CDN 域名选择 Referer(抖音/小红书各自校验) */
+    /** Selects the platform Referer required by the target CDN hostname. */
     private fun refererFor(url: String): String {
         return when {
             url.contains("xhscdn.com") -> "https://www.xiaohongshu.com/"
@@ -392,6 +399,7 @@ class AndroidDownloadRepository : DownloadRepository {
         }
     }
 
+    /** Releases the accumulated speed samples for one task. */
     fun release() {
         scope.cancel()
     }
@@ -404,12 +412,13 @@ class AndroidDownloadRepository : DownloadRepository {
     }
 }
 
-/** 3 秒滑动窗口速度计(采样 (时间戳, 累计字节),窗口内差值 / 窗口时长) */
+/** Three-second sliding-window speed meter based on timestamped byte samples. */
 private class SpeedMeter(private val windowMs: Long = 3000) {
     private val samples = ArrayDeque<Pair<Long, Long>>()
     private var lastBytes = 0L
     private var lastTime = System.currentTimeMillis()
 
+    /** Records a cumulative byte sample after a successful stream read. */
     fun addSample(bytes: Long) {
         val now = System.currentTimeMillis()
         lastBytes = bytes
@@ -420,6 +429,7 @@ private class SpeedMeter(private val windowMs: Long = 3000) {
         }
     }
 
+    /** Returns the three-second sliding-window average in bytes per second. */
     fun speedBps(): Long {
         if (samples.size < 2) return 0
         val (t0, b0) = samples.first()

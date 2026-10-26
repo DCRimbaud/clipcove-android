@@ -1,3 +1,10 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * Copyright (c) 2026 DCRimbaud
+ * Author: DCRimbaud
+ *
+ * Runs FFmpeg media merging outside the UI thread and reports task outcomes.
+ */
 package com.douyin.data.merger
 
 import android.content.ContentValues
@@ -15,10 +22,10 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 
-/** ffmpeg-kit 实现:后台协程执行合成,完成后保存到公共下载目录 */
+/** ffmpeg-kit implementation that merges in a background coroutine and copies the result to public Downloads. */
 class FfmpegVideoMerger : VideoMerger {
 
-    // 合成串行化:固定临时文件,并发任务会互相覆盖,必须排队
+    // Serialize merges because the implementation uses fixed temporary filenames.
     private val mutex = Mutex()
 
     override fun merge(

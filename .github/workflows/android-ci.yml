@@ -37,6 +37,9 @@ jobs:
       - name: Install Android SDK 34
         run: sdkmanager "platforms;android-34" "build-tools;34.0.0"
 
+      - name: Validate code comments
+        run: python tools/check_comments.py
+
       - name: Unit tests and debug build
         env:
           PYTHON_EXE: ${{ steps.python.outputs.python-path }}

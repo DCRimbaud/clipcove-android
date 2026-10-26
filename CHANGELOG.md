@@ -2,6 +2,22 @@
 
 All notable changes to ClipCove are documented here.
 
+## [1.3.0] - 2026-10-26
+
+### Added
+
+- Full normalized metadata extraction for Douyin and Xiaohongshu, including descriptions, author handles and avatars, hashtags, locations, play/recommend counters, soundtrack authors, durations, covers, and share URLs.
+- A compact metadata panel and expandable full captions in parse results.
+- Explicit image actions: per-image original download, batch download, Live Photo download, soundtrack merge, cover download, and copy-source-link.
+- A launcher icon that matches the Home brand mark across legacy, adaptive, and monochrome Android icon formats.
+- Complete English and Simplified Chinese interface resources with an in-app language picker for System, English, and Simplified Chinese.
+
+### Changed
+
+- Music rows now show soundtrack author and duration.
+- Video candidates retain declared width, height, and size when the platform exposes them.
+- Version name set to `1.3.0` (`versionCode` 23).
+
 ## [1.2.1] - 2026-10-26
 
 ### Fixed

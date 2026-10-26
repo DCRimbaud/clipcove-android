@@ -1,3 +1,10 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * Copyright (c) 2026 DCRimbaud
+ * Author: DCRimbaud
+ *
+ * Central motion tokens and accessible press feedback shared by Compose screens.
+ */
 package com.douyin.core.designsystem
 
 import androidx.compose.animation.core.CubicBezierEasing
@@ -15,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
 
+/** Central motion durations and easing curves shared by every screen. */
 object DyMotion {
     const val QuickMs = 140
     const val StandardMs = 240

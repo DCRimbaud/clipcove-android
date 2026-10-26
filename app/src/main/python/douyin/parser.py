@@ -1,4 +1,9 @@
-"""分享文本 / 链接解析:提取抖音短链并还原为 aweme_id。"""
+"""Share-text and short-link parsing for Douyin references.
+
+SPDX-License-Identifier: GPL-3.0-only
+Copyright (c) 2026 DCRimbaud
+Author: DCRimbaud
+"""
 
 import re
 
@@ -9,20 +14,20 @@ UA = (
     "(KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
 )
 
-# 匹配 v.douyin.com/xxx 短链(分享口令、网页链接里都可能出现)
+# Matches v.douyin.com short links embedded in share text.
 SHORT_URL_RE = re.compile(r"https?://v\.douyin\.com/[A-Za-z0-9_\-/]+")
-# 直接是完整详情页链接
+# Matches full Douyin video or note URLs.
 FULL_URL_RE = re.compile(r"https?://www\.douyin\.com/(?:video|note)/(\d+)")
-# 兜底:文本中裸的 19 位数字 id
+# Fallback for a bare aweme ID in user input.
 RAW_ID_RE = re.compile(r"\b(\d{15,20})\b")
 
 
 class ParseError(Exception):
-    pass
+    """Raised when share text does not contain a supported Douyin reference."""
 
 
 def extract_short_url(text: str) -> str:
-    """从分享口令/文本中提取短链。"""
+    """Extract the first supported short or full URL from share text."""
     m = SHORT_URL_RE.search(text)
     if m:
         return m.group(0)
@@ -32,13 +37,21 @@ def extract_short_url(text: str) -> str:
     raise ParseError("未在输入中找到抖音链接")
 
 def resolve_short_url(short_url: str, timeout: int = 15) -> str:
-    """请求短链,跟随重定向,返回最终跳转 URL。"""
+    """Resolve a short link and return its final redirect URL.
+
+    Args:
+        short_url: Official Douyin short URL.
+        timeout: Per-request timeout in seconds.
+
+    Returns:
+        The final URL reported by the redirect chain.
+    """
     resp = requests.get(short_url, headers={"User-Agent": UA}, allow_redirects=True, timeout=timeout)
     return resp.url
 
 
 def aweme_id_from_url(url: str) -> str:
-    """从(重定向后的)URL 中提取 aweme_id。"""
+    """Extract a numeric aweme ID from a full or redirected URL."""
     m = FULL_URL_RE.search(url)
     if m:
         return m.group(1)
@@ -49,9 +62,21 @@ def aweme_id_from_url(url: str) -> str:
 
 
 def parse_share_text(text: str, timeout: int = 15) -> str:
-    """解析分享文本/链接,返回 aweme_id。"""
+    """Normalize share text into a numeric Douyin aweme ID.
+
+    Args:
+        text: Raw share text, URL, or numeric ID.
+        timeout: Redirect timeout used for short links.
+
+    Returns:
+        A validated numeric aweme ID.
+
+    Raises:
+        ParseError: No supported reference can be extracted.
+        requests.RequestException: A short-link request fails.
+    """
     text = text.strip()
-    # 纯数字直接当 aweme_id
+    # A bare numeric ID is already the final identifier.
     m = RAW_ID_RE.fullmatch(text)
     if m:
         return m.group(1)

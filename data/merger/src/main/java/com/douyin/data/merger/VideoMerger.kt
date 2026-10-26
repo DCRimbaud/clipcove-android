@@ -1,14 +1,21 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * Copyright (c) 2026 DCRimbaud
+ * Author: DCRimbaud
+ *
+ * Defines the media merger port consumed by feature code.
+ */
 package com.douyin.data.merger
 
 import android.content.Context
 
 /**
- * 视频合成接口:动图画面 + 音乐音轨 → 合成 mp4。
- * 当前实现基于 ffmpeg-kit;可替换实现不影响上层。
+ * Video merger contract: combine a live-photo video with an audio track into one MP4.
+ * The current adapter uses ffmpeg-kit; callers depend only on this port.
  */
 interface VideoMerger {
 
-    /** 异步合成,完成后回调 onResult(success, message) */
+    /** Starts an asynchronous merge and reports success or a user-readable failure message. */
     fun merge(
         context: Context,
         videoUrl: String,

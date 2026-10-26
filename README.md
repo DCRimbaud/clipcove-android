@@ -14,7 +14,8 @@ ClipCove is a local-first Android media downloader for **Douyin** and **Xiaohong
 - Video, original gallery image, audio, and Live Photo downloads
 - Xiaohongshu original-file priority via `originVideoKey`, with transparent transcoded fallback metadata
 - Download-quality selection with resolution, size, bitrate, and watermark-risk labels
-- One-tap batch downloads for multi-image galleries
+- Explicit original-image, batch-gallery, Live Photo, soundtrack, and cover downloads
+- Full normalized captions, author handles, hashtags, locations, counters, soundtrack metadata, and source links
 - Download search, status filters, and confirmed cleanup for completed tasks
 - Favorites search and one-tap source-link copying
 - Optional auto-parse when a share link is sent to ClipCove
@@ -27,6 +28,7 @@ ClipCove is a local-first Android media downloader for **Douyin** and **Xiaohong
 - Clear-all data control and configurable release signing
 - Live Photo and audio merging with FFmpeg
 - Built-in WiFi transfer server for moving files to a computer
+- Complete English and Simplified Chinese UI with follow-system and in-app language switching
 - Refined dark Jetpack Compose UI with restrained motion, press feedback, and animated progress states
 - Android 7.0+ support (minSdk 24)
 
@@ -46,6 +48,7 @@ app/                   Application shell, navigation, DI, platform adapters
 core/
   model/               Typed media models and parse results
   designsystem/        Theme and shared Compose components
+  ui-resources/        Shared English and Simplified Chinese UI strings
   common/              Diagnostics contracts and sanitization
 data/
   douyin/              Douyin parser port and JSON mapper
@@ -86,6 +89,7 @@ $env:PYTHON_EXE = "C:\path\to\python.exe"
 Set-Content local.properties 'sdk.dir=C\:\\Android'
 
 .\gradlew.bat lintDebug testDebugUnitTest assembleDebug
+python tools\check_comments.py
 ```
 
 ### macOS / Linux
@@ -104,6 +108,7 @@ The debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
 
 ```powershell
 .\gradlew.bat lintDebug testDebugUnitTest assembleDebug
+python tools\check_comments.py
 python tools\smoke_network.py
 ```
 

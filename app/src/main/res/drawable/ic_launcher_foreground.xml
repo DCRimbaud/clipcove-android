@@ -1,21 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  ClipCove app icon v3(圆内三角):
-  · 深色背景 + 中央红色圆形(半径 32,严格居中)
-  · 白色播放三角内嵌(宽:高 ≈ 1:1.12,经典播放键比例)
-  视口 108dp,中心(54,54)
+  ClipCove launcher foreground.
+  The mark matches the Home brand tile: a red-to-orange rounded square and a
+  white open "C". The dark background is provided by the adaptive icon.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- 红色圆形 -->
+    <path android:pathData="M42,28 H66 A14,14 0,0 1,80 42 V66 A14,14 0,0 1,66 80 H42 A14,14 0,0 1,28 66 V42 A14,14 0,0 1,42 28 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="28"
+                android:startY="28"
+                android:endX="80"
+                android:endY="80"
+                android:startColor="#FF466C"
+                android:centerColor="#FF7A5C"
+                android:endColor="#FFFF9A62" />
+        </aapt:attr>
+    </path>
     <path
-        android:fillColor="#FF466C"
-        android:pathData="M54,22 a32,32 0 1 1 -0.01,0 z" />
-    <!-- 白色播放三角:高 38,宽 34,中心(54,54) -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M54,37 L73,70 L35,70 z" />
+        android:pathData="M64,42 C50,32 35,42 35,54 C35,66 50,76 64,66"
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="6.4"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
 </vector>

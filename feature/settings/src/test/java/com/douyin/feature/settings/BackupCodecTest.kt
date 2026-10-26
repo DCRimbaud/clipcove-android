@@ -1,3 +1,10 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * Copyright (c) 2026 DCRimbaud
+ * Author: DCRimbaud
+ *
+ * Protects backup compatibility and round-trip behavior.
+ */
 package com.douyin.feature.settings
 
 import com.douyin.core.model.MediaPlatform
@@ -9,8 +16,10 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+/** Protects backup round-trip, legacy compatibility, and schema rejection. */
 class BackupCodecTest {
 
+    /** Ensures the current backup schema round-trips without losing source links. */
     @Test
     fun `round trips versioned backup with source urls`() {
         val json = BackupCodec.encode(
@@ -41,6 +50,7 @@ class BackupCodecTest {
         assertEquals(MediaPlatform.XIAOHONGSHU, payload.favorites.single().platform)
     }
 
+    /** Ensures legacy flat-array backups remain importable. */
     @Test
     fun `imports legacy flat array export`() {
         val legacy = JSONArray()
@@ -69,6 +79,7 @@ class BackupCodecTest {
         assertEquals("f1", payload.favorites.single().awemeId)
     }
 
+    /** Ensures backups from unknown newer schemas are rejected safely. */
     @Test
     fun `rejects a newer schema version`() {
         val error = runCatching {

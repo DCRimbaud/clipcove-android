@@ -1,3 +1,10 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * Copyright (c) 2026 DCRimbaud
+ * Author: DCRimbaud
+ *
+ * Adapts the Chaquopy Douyin resolver response into the typed Kotlin parse contract.
+ */
 package com.douyin.parser
 
 import android.util.Log
@@ -11,7 +18,7 @@ import com.douyin.data.douyin.DouyinRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/** Chaquopy 适配器：只负责调用 Python，平台 JSON 由 data 层映射。 */
+/** Chaquopy adapter: invokes Python and delegates platform JSON mapping to the data layer. */
 class ChaquopyDouyinRepository : DouyinRepository {
 
     override suspend fun resolve(input: String): ParseResult = withContext(Dispatchers.IO) {

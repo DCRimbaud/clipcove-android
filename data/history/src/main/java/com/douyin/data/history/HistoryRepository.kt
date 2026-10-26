@@ -1,3 +1,10 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * Copyright (c) 2026 DCRimbaud
+ * Author: DCRimbaud
+ *
+ * Defines bounded history persistence and source-link retention for re-resolution.
+ */
 package com.douyin.data.history
 
 import android.content.Context
@@ -5,8 +12,8 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * 解析历史条目。
- * @param sourceUrl 原始链接(小红书必需:分享链接带时效 token,仅存 ID 无法重新解析)
+ * Persisted parse-history entry.
+ * @param sourceUrl Original share URL; Xiaohongshu needs its time-limited token to resolve again.
  */
 data class HistoryItem(
     val awemeId: String,
@@ -16,14 +23,17 @@ data class HistoryItem(
     val sourceUrl: String = ""
 )
 
-/** 历史仓库接口 */
+/** History persistence port used by feature code. */
 interface HistoryRepository {
+    /** Returns history newest first, recovering safely from corrupt storage. */
     fun load(): List<HistoryItem>
+    /** Adds or replaces one history entry by stable media ID. */
     fun add(item: HistoryItem)
+    /** Deletes all history entries without touching favorites or downloads. */
     fun clear()
 }
 
-/** SharedPreferences 实现:最多 20 条,同 ID 去重 */
+/** SharedPreferences-backed history with a twenty-item cap and stable-ID deduplication. */
 class PrefsHistoryRepository(context: Context) : HistoryRepository {
 
     private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -43,7 +53,7 @@ class PrefsHistoryRepository(context: Context) : HistoryRepository {
                 )
             }
         } catch (e: Exception) {
-            // 数据损坏时容错,不崩溃
+            // Corrupt persisted data is ignored rather than crashing the app.
             emptyList()
         }
     }

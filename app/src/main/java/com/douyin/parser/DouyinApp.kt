@@ -1,3 +1,10 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * Copyright (c) 2026 DCRimbaud
+ * Author: DCRimbaud
+ *
+ * Composition root for dependency injection, HTTP clients, image loading, and platform adapters.
+ */
 package com.douyin.parser
 
 import com.chaquo.python.android.PyApplication
@@ -29,7 +36,7 @@ import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.core.context.startKoin
 import org.koin.dsl.module
 
-/** 依赖注入装配:app 层是唯一知道具体实现的地方,feature 只依赖接口 */
+/** Dependency-injection composition root: only the app layer knows concrete implementations. */
 val appModule = module {
     single<DouyinRepository> { ChaquopyDouyinRepository() }
     single<XhsRepository> { ChaquopyXhsRepository() }
@@ -81,10 +88,15 @@ val appModule = module {
     }
 }
 
+/**
+ * ClipCove application composition root.
+ *
+ * Owns long-lived clients and binds feature ports to concrete platform adapters.
+ */
 class DouyinApp : PyApplication() {
     override fun onCreate() {
         super.onCreate()
-        // Coil 全局配置:按图片域名设置对应平台的 Referer(抖音/小红书 CDN 各自校验)
+        // Configure Coil Referer headers because each platform CDN validates its own origin.
         val okHttp = okhttp3.OkHttpClient.Builder()
             .addInterceptor { chain ->
                 val host = chain.request().url.host
@@ -116,7 +128,7 @@ class DouyinApp : PyApplication() {
         startDownloadService()
     }
 
-    /** 启动下载前台服务(服务内部在无活动任务时自动停止) */
+    /** Starts the download foreground service, which stops itself when no active task remains. */
     private fun startDownloadService() {
         try {
             val intent = android.content.Intent(this, DownloadService::class.java)

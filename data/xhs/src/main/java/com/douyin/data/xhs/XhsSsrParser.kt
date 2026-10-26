@@ -1,3 +1,10 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * Copyright (c) 2026 DCRimbaud
+ * Author: DCRimbaud
+ *
+ * Parses official Xiaohongshu SSR payloads into normalized media contracts without network access.
+ */
 package com.douyin.data.xhs
 
 import com.douyin.core.model.MediaImage
@@ -13,9 +20,16 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.security.MessageDigest
 
-/** 纯解析器：输入官方笔记页 HTML，输出统一媒体模型，不执行网络请求。 */
+/** Pure parser that converts official note-page HTML into the normalized media model without network access. */
 object XhsSsrParser {
 
+    /**
+     * Parses an official Xiaohongshu note page without performing network I/O.
+     *
+     * @param html Raw SSR page HTML.
+     * @param sourceUrl Original share URL used for token-preserving diagnostics.
+     * @return Normalized media or a typed failure when the SSR contract is absent.
+     */
     fun parse(html: String, sourceUrl: String): ParseResult {
         val state = extractInitialState(html)
             ?: return failure(
@@ -171,6 +185,21 @@ object XhsSsrParser {
         )
         val rawTime = note.optLong("time", 0)
         val interact = note.optJSONObject("interactInfo")
+        val user = note.optJSONObject("user")
+        val tagList = note.optJSONArray("tagList")
+        val music = note.optJSONObject("music")
+        val musicPlay = music?.optJSONObject("playUrl")
+            ?: music?.optJSONObject("play_url")
+        val musicUrl = secureUrl(
+            musicPlay?.optString("url")
+                ?.ifBlank { musicPlay.optJSONArray("urlList")?.optString(0).orEmpty() }
+                .orEmpty()
+        )
+        val musicCover = secureUrl(
+            music?.optJSONObject("cover")?.optString("url")
+                ?: music?.optJSONObject("cover")?.optJSONArray("urlList")?.optString(0).orEmpty()
+        )
+        val musicDuration = music?.optLong("duration", 0L) ?: 0L
 
         return MediaInfo(
             id = note.optString("noteId").ifBlank {
@@ -180,8 +209,8 @@ object XhsSsrParser {
             title = note.optString("title").ifBlank {
                 note.optString("desc").lineSequence().firstOrNull().orEmpty()
             }.ifBlank { "(无标题)" },
-            author = note.optJSONObject("user")?.optString("nickname")
-                ?.ifBlank { note.optJSONObject("user")?.optString("nickName").orEmpty() }
+            author = user?.optString("nickname")
+                ?.ifBlank { user?.optString("nickName").orEmpty() }
                 .orEmpty(),
             coverUrl = videoCover.ifBlank { firstImageUrl },
             createdAtSeconds = if (rawTime > 1_000_000_000_000L) rawTime / 1000 else rawTime,
@@ -191,11 +220,47 @@ object XhsSsrParser {
                 commentCount = interact.optCount("commentCount"),
                 collectCount = interact.optCount("collectedCount"),
                 shareCount = interact.optCount("shareCount"),
+                playCount = interact.optCount("viewCount"),
             ),
+            description = note.optString("desc"),
+            authorId = user?.let {
+                it.optString("authorID")
+                    .ifBlank { it.optString("userId").ifBlank { it.optString("user_id") } }
+            }.orEmpty(),
+            authorHandle = user?.let {
+                it.optString("redId").ifBlank { it.optString("red_id") }
+            }.orEmpty(),
+            authorAvatarUrl = secureUrl(user?.optJSONObject("avatar")?.optString("url").orEmpty()),
+            hashtags = tagList.toTagNames(),
+            location = note.optString("ipLocation")
+                .ifBlank { note.optString("location") }
+                .ifBlank { note.optJSONObject("poiInfo")?.optString("name").orEmpty() },
+            shareUrl = note.optString("shareUrl").ifBlank { sourceUrl },
             videoUrl = videoUrl,
             videoCandidates = candidates,
+            musicUrl = musicUrl,
+            musicTitle = music?.optString("title").orEmpty(),
+            musicAuthor = music?.optString("author").orEmpty(),
+            musicDurationMs = if (musicDuration in 1..999) musicDuration * 1000 else musicDuration,
+            musicCoverUrl = musicCover,
             images = images.toMediaImages(),
         )
+    }
+
+    private fun JSONArray?.toTagNames(): List<String> {
+        if (this == null) return emptyList()
+        return buildList {
+            for (index in 0 until length()) {
+                val item = opt(index)
+                val name = when (item) {
+                    is JSONObject -> item.optString("name")
+                        .ifBlank { item.optString("tagName") }
+                        .ifBlank { item.optString("tag_name") }
+                    else -> item?.toString().orEmpty()
+                }.trim()
+                if (name.isNotEmpty() && name !in this) add(name)
+            }
+        }
     }
 
     private fun JSONArray?.toVideoCandidates(): List<VideoCandidate> {

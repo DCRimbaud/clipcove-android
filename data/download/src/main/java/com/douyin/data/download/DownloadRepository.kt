@@ -1,27 +1,34 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * Copyright (c) 2026 DCRimbaud
+ * Author: DCRimbaud
+ *
+ * Defines the download repository contract used by features and services.
+ */
 package com.douyin.data.download
 
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * 下载仓库接口:feature 层只依赖此接口,实现可替换(本地/远程)。
+ * Download repository contract. Features depend only on this port so storage implementations remain replaceable.
  */
 interface DownloadRepository {
 
-    /** 任务列表(最新在前),UI 订阅自动刷新 */
+    /** Task snapshots ordered newest first; observers refresh automatically. */
     val tasks: StateFlow<List<DownloadTask>>
 
-    /** 初始化(需 Application Context) */
+    /** Initializes storage and restoration with an application context. */
     fun init(context: android.content.Context)
 
-    /** 加入下载队列 */
+    /** Enqueues a download and starts it subject to the global concurrency limit. */
     fun enqueue(title: String, filename: String, url: String): DownloadTask
 
-    /** 暂停下载:保留 .part 断点文件,可 resume 续传 */
+    /** Pauses a download while retaining its part file for later resume. */
     fun pause(task: DownloadTask)
 
-    /** 继续下载:从断点(Range)恢复 */
+    /** Resumes a paused task from its persisted byte offset. */
     fun resume(task: DownloadTask)
 
-    /** 删除任务并清理文件 */
+    /** Removes a task and its private backing files. */
     fun remove(task: DownloadTask)
 }

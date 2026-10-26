@@ -1,3 +1,10 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * Copyright (c) 2026 DCRimbaud
+ * Author: DCRimbaud
+ *
+ * Shared Compose surfaces, headers, pills, and empty states for the ClipCove design system.
+ */
 package com.douyin.core.designsystem
 
 import androidx.compose.animation.animateContentSize
@@ -37,6 +44,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable
+/**
+ * Paints the static ClipCove ambient background and hosts page content.
+ *
+ * The background uses only static gradients; it does not animate or allocate
+ * per-frame state. Callers remain responsible for sizing and safe insets.
+ */
 fun DyAmbientBackground(
     modifier: Modifier = Modifier,
     content: @Composable BoxScope.() -> Unit,
@@ -71,6 +84,12 @@ fun DyAmbientBackground(
 }
 
 @Composable
+/**
+ * Renders the primary page title, optional eyebrow, and trailing action.
+ *
+ * Text is constrained to avoid crowding compact screens. The trailing slot is
+ * intentionally caller-owned so navigation actions remain screen-specific.
+ */
 fun DyPageHeader(
     title: String,
     subtitle: String? = null,
@@ -129,6 +148,9 @@ fun DyPageHeader(
 }
 
 @Composable
+/**
+ * Renders a section heading with the shared accent rail and optional trailing slot.
+ */
 fun DySectionHeader(
     title: String,
     subtitle: String? = null,
@@ -163,6 +185,11 @@ fun DySectionHeader(
 }
 
 @Composable
+/**
+ * Shared elevated panel with content-size animation for changing state.
+ *
+ * The panel performs no business logic and accepts arbitrary content actions.
+ */
 fun DyPanel(
     modifier: Modifier = Modifier,
     color: Color = DyCard,
@@ -188,6 +215,13 @@ fun DyPanel(
 }
 
 @Composable
+/**
+ * Compact status pill with an optional leading icon.
+ *
+ * @param text User-visible label.
+ * @param color Accent color used for background, border, and icon.
+ * @param icon Optional semantic icon.
+ */
 fun DyPill(
     text: String,
     color: Color = DyRed,
@@ -212,6 +246,13 @@ fun DyPill(
 }
 
 @Composable
+/**
+ * Circular accent tile used consistently for metadata, actions, and empty states.
+ *
+ * @param icon Vector icon to render.
+ * @param tint Accent color applied to the gradient, border, and icon.
+ * @param size Tile size in density-independent pixels.
+ */
 fun DyIconTile(
     icon: ImageVector,
     tint: Color = DyRed,
@@ -235,6 +276,14 @@ fun DyIconTile(
 }
 
 @Composable
+/**
+ * Shared empty-state block for lists and unavailable content.
+ *
+ * @param icon Visual anchor for the state.
+ * @param title Short state title.
+ * @param description Action-oriented explanation.
+ * @param action Optional recovery action owned by the caller.
+ */
 fun DyEmptyState(
     icon: ImageVector,
     title: String,

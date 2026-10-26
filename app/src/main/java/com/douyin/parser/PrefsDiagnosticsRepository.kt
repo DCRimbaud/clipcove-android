@@ -1,3 +1,10 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * Copyright (c) 2026 DCRimbaud
+ * Author: DCRimbaud
+ *
+ * Persists a bounded, sanitized diagnostics history for user-exported support reports.
+ */
 package com.douyin.parser
 
 import android.content.Context

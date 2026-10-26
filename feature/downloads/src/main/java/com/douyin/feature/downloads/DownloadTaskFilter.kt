@@ -1,8 +1,16 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * Copyright (c) 2026 DCRimbaud
+ * Author: DCRimbaud
+ *
+ * Applies deterministic query and status filters to download tasks.
+ */
 package com.douyin.feature.downloads
 
 import com.douyin.data.download.DownloadStatus
 import com.douyin.data.download.DownloadTask
 
+/** User-selectable download status filter. */
 internal enum class DownloadFilter {
     ALL,
     ACTIVE,
@@ -10,7 +18,9 @@ internal enum class DownloadFilter {
     FAILED,
 }
 
+/** Pure query/status filtering for observable download tasks. */
 internal object DownloadTaskFilter {
+    /** Applies the status filter and a case-insensitive title/filename search. */
     fun apply(tasks: List<DownloadTask>, query: String, filter: DownloadFilter): List<DownloadTask> {
         val cleanQuery = query.trim()
         return tasks.filter { task ->

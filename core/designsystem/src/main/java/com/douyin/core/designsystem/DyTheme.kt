@@ -1,3 +1,10 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * Copyright (c) 2026 DCRimbaud
+ * Author: DCRimbaud
+ *
+ * ClipCove color, typography, and shape tokens applied through Material 3.
+ */
 package com.douyin.core.designsystem
 
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -58,6 +65,11 @@ private val DyTypography = Typography(
 )
 
 @Composable
+/**
+ * Applies ClipCove's dark Material 3 color, typography, and shape system.
+ *
+ * @param content Composable tree rendered inside the theme.
+ */
 fun DyTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = DyColorScheme,

@@ -1,3 +1,10 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * Copyright (c) 2026 DCRimbaud
+ * Author: DCRimbaud
+ *
+ * Parses and compares ClipCove semantic versions including release candidates.
+ */
 package com.douyin.data.update
 
 /** Numeric semantic version used for update comparisons. */
@@ -24,7 +31,8 @@ data class SemanticVersion(
             """(?i)^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$"""
         )
 
-        fun parse(value: String): SemanticVersion? {
+        /** Parses a leading semantic version, including optional release-candidate suffixes. */
+    fun parse(value: String): SemanticVersion? {
             val match = pattern.matchEntire(value.trim()) ?: return null
             return SemanticVersion(
                 major = match.groupValues[1].toIntOrNull() ?: return null,

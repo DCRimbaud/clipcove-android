@@ -1,3 +1,10 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * Copyright (c) 2026 DCRimbaud
+ * Author: DCRimbaud
+ *
+ * Encodes and decodes versioned backup payloads with legacy compatibility.
+ */
 package com.douyin.feature.settings
 
 import com.douyin.data.favorites.FavoriteItem
@@ -5,15 +12,18 @@ import com.douyin.data.history.HistoryItem
 import org.json.JSONArray
 import org.json.JSONObject
 
+/** Decoded backup contents plus metadata used for validation and diagnostics. */
 internal data class BackupPayload(
     val history: List<HistoryItem>,
     val favorites: List<FavoriteItem>,
 )
 
+/** Versioned JSON backup codec with read compatibility for legacy flat arrays. */
 internal object BackupCodec {
     const val SCHEMA_VERSION = 1
     private const val APP_NAME = "ClipCove"
 
+    /** Serializes history and favorites into the current backup schema. */
     fun encode(
         history: List<HistoryItem>,
         favorites: List<FavoriteItem>,
@@ -54,6 +64,11 @@ internal object BackupCodec {
             .toString(2)
     }
 
+    /**
+     * Parses the current schema and the legacy flat-array schema.
+     *
+     * @throws IllegalArgumentException when JSON or required fields are invalid.
+     */
     fun decode(raw: String): BackupPayload {
         val clean = raw.removePrefix("\uFEFF").trim()
         if (clean.isBlank()) throw IllegalArgumentException("Backup file is empty")

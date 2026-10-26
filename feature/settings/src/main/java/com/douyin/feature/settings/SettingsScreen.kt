@@ -1,6 +1,14 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * Copyright (c) 2026 DCRimbaud
+ * Author: DCRimbaud
+ *
+ * Renders preferences, transfer controls, data management, update state, and confirmation dialogs.
+ */
 package com.douyin.feature.settings
 
 import android.Manifest
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -46,6 +54,7 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.Settings
@@ -59,6 +68,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -75,6 +85,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -98,14 +109,23 @@ import com.douyin.core.designsystem.DySectionHeader
 import com.douyin.core.designsystem.DyText
 import com.douyin.core.designsystem.DyTextSecondary
 import com.douyin.core.designsystem.dyPressable
+import com.douyin.core.uiresources.R as SharedR
+import com.douyin.data.settings.AppLanguage
 import com.douyin.data.update.AppRelease
 import java.io.File
 
 @Composable
+/**
+ * Renders preferences, LAN transfer, local-data controls, and update state.
+ *
+ * Toast messages are consumed after display. Destructive operations use explicit
+ * confirmation dialogs and remain delegated to SettingsViewModel.
+ */
 fun SettingsScreen(viewModel: SettingsViewModel) {
     val autoSave by viewModel.autoSave.collectAsStateWithLifecycle()
     val autoParseSharedLinks by viewModel.autoParseSharedLinks.collectAsStateWithLifecycle()
     val autoUpdateMirrors by viewModel.autoUpdateMirrors.collectAsStateWithLifecycle()
+    val appLanguage by viewModel.appLanguage.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     val wifiRunning by viewModel.wifiRunning.collectAsStateWithLifecycle()
     val wifiUrl by viewModel.wifiUrl.collectAsStateWithLifecycle()
@@ -139,6 +159,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
     val context = LocalContext.current
     var showChangelog by remember { mutableStateOf(false) }
     var showClearAllConfirm by remember { mutableStateOf(false) }
+    var showLanguageDialog by remember { mutableStateOf(false) }
     val importBackup = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
     ) { uri ->
@@ -156,7 +177,8 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
 
     LaunchedEffect(message) {
         message?.let {
-            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+            val text = context.getString(it.resourceId, *it.args.toTypedArray())
+            Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
             viewModel.consumeMessage()
         }
     }
@@ -169,18 +191,29 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         DyPageHeader(
-            title = "设置",
-            subtitle = "管理保存、传输和本地数据。",
-            eyebrow = "PREFERENCES",
+            title = stringResource(SharedR.string.nav_settings),
+            subtitle = stringResource(SharedR.string.settings_subtitle),
+            eyebrow = stringResource(SharedR.string.settings_eyebrow),
             trailing = { DyPill("v${viewModel.versionName}", DyCyan) },
         )
 
-        SettingsSection(title = "常规") {
+        SettingsSection(title = stringResource(SharedR.string.settings_general)) {
+            ActionRow(
+                icon = Icons.Filled.Language,
+                tint = DyCyan,
+                title = stringResource(SharedR.string.language_title),
+                description = stringResource(
+                    SharedR.string.settings_language_current,
+                    languageLabel(appLanguage),
+                ),
+                onClick = { showLanguageDialog = true },
+            )
+            HorizontalDivider(color = DyBorder.copy(alpha = 0.6f))
             SettingRow(
                 icon = Icons.Filled.Download,
                 tint = DyGreen,
-                title = "自动保存到下载目录",
-                description = "下载完成后同步保存到手机公共「下载」目录。",
+                title = stringResource(SharedR.string.settings_auto_save_title),
+                description = stringResource(SharedR.string.settings_auto_save_description),
                 trailing = {
                     Switch(
                         checked = autoSave,
@@ -198,8 +231,8 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             SettingRow(
                 icon = Icons.Filled.ContentPaste,
                 tint = DyCyan,
-                title = "分享链接自动解析",
-                description = "从其他 App 分享链接到 ClipCove 后立即开始解析。",
+                title = stringResource(SharedR.string.settings_auto_parse_title),
+                description = stringResource(SharedR.string.settings_auto_parse_description),
                 trailing = {
                     Switch(
                         checked = autoParseSharedLinks,
@@ -217,8 +250,8 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             SettingRow(
                 icon = Icons.Filled.SystemUpdate,
                 tint = DyGreen,
-                title = "更新加速线路",
-                description = "自动探测并切换 GitHub 加速线路；安装包仍会校验签名和 SHA-256。",
+                title = stringResource(SharedR.string.settings_update_mirrors_title),
+                description = stringResource(SharedR.string.settings_update_mirrors_description),
                 trailing = {
                     Switch(
                         checked = autoUpdateMirrors,
@@ -234,12 +267,16 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             )
         }
 
-        SettingsSection(title = "局域网传文件") {
+        SettingsSection(title = stringResource(SharedR.string.settings_lan_section)) {
             SettingRow(
                 icon = Icons.Filled.Wifi,
                 tint = DyCyan,
-                title = "WiFi 传文件到电脑",
-                description = if (wifiRunning) "保持同一 WiFi，在电脑浏览器访问下方地址。" else "开启后，电脑可直接浏览并下载手机内文件。",
+                title = stringResource(SharedR.string.settings_wifi_title),
+                description = if (wifiRunning) {
+                    stringResource(SharedR.string.settings_wifi_description_on)
+                } else {
+                    stringResource(SharedR.string.settings_wifi_description_off)
+                },
                 trailing = {
                     Button(
                         onClick = viewModel::toggleWifi,
@@ -251,7 +288,14 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                         ),
                         border = if (wifiRunning) BorderStroke(1.dp, DyBorder) else null,
                     ) {
-                        Text(if (wifiRunning) "停止" else "开启", fontSize = 13.sp)
+                        Text(
+                            if (wifiRunning) {
+                                stringResource(SharedR.string.action_stop)
+                            } else {
+                                stringResource(SharedR.string.action_start)
+                            },
+                            fontSize = 13.sp,
+                        )
                     }
                 },
             )
@@ -278,7 +322,11 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text("访问地址", style = MaterialTheme.typography.bodySmall, color = DyTextSecondary)
+                        Text(
+                            stringResource(SharedR.string.settings_wifi_access),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = DyTextSecondary,
+                        )
                         Spacer(Modifier.weight(1f))
                         Text(wifiUrl, style = MaterialTheme.typography.labelLarge, color = DyCyan, maxLines = 1)
                     }
@@ -286,20 +334,20 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             }
         }
 
-        SettingsSection(title = "数据管理") {
+        SettingsSection(title = stringResource(SharedR.string.settings_data_section)) {
             ActionRow(
                 icon = Icons.Filled.Save,
                 tint = DyCyan,
-                title = "导出备份",
-                description = "包含历史、收藏和原始链接的 JSON 文件",
+                title = stringResource(SharedR.string.settings_export_backup_title),
+                description = stringResource(SharedR.string.settings_export_backup_description),
                 onClick = { exportBackup(context, viewModel) },
             )
             HorizontalDivider(color = DyBorder.copy(alpha = 0.6f))
             ActionRow(
                 icon = Icons.Filled.UploadFile,
                 tint = DyGreen,
-                title = "从备份还原",
-                description = "支持当前版本和旧版备份，重复条目会自动合并",
+                title = stringResource(SharedR.string.settings_restore_backup_title),
+                description = stringResource(SharedR.string.settings_restore_backup_description),
                 onClick = {
                     importBackup.launch(
                         arrayOf("application/json", "text/plain", "application/octet-stream")
@@ -310,42 +358,42 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             ActionRow(
                 icon = Icons.Filled.History,
                 tint = DyAmber,
-                title = "清空历史记录",
-                description = "不会删除已经下载的文件",
+                title = stringResource(SharedR.string.settings_clear_history_title),
+                description = stringResource(SharedR.string.settings_clear_history_description),
                 onClick = viewModel::clearHistory,
             )
             HorizontalDivider(color = DyBorder.copy(alpha = 0.6f))
             ActionRow(
                 icon = Icons.Filled.Delete,
                 tint = DyRed,
-                title = "清空下载列表",
-                description = "同时清理应用内的下载文件",
+                title = stringResource(SharedR.string.settings_clear_downloads_title),
+                description = stringResource(SharedR.string.settings_clear_downloads_description),
                 onClick = viewModel::clearDownloads,
             )
             HorizontalDivider(color = DyBorder.copy(alpha = 0.6f))
             ActionRow(
                 icon = Icons.Filled.DeleteForever,
                 tint = DyRed,
-                title = "清空全部本地数据",
-                description = "删除历史、收藏、下载记录和诊断信息，需再次确认",
+                title = stringResource(SharedR.string.settings_clear_all_title),
+                description = stringResource(SharedR.string.settings_clear_all_description),
                 onClick = { showClearAllConfirm = true },
             )
         }
 
-        SettingsSection(title = "诊断与更新") {
+        SettingsSection(title = stringResource(SharedR.string.settings_updates_section)) {
             ActionRow(
                 icon = Icons.Filled.BugReport,
                 tint = DyAmber,
-                title = "导出诊断报告",
-                description = "仅包含最多 50 条脱敏解析失败记录，不含分享链接",
+                title = stringResource(SharedR.string.settings_export_diagnostics_title),
+                description = stringResource(SharedR.string.settings_export_diagnostics_description),
                 onClick = { exportDiagnostics(context, viewModel) },
             )
             HorizontalDivider(color = DyBorder.copy(alpha = 0.6f))
             ActionRow(
                 icon = Icons.Filled.Delete,
                 tint = DyTextSecondary,
-                title = "清空诊断记录",
-                description = "不会影响历史、收藏或已下载文件",
+                title = stringResource(SharedR.string.settings_clear_diagnostics_title),
+                description = stringResource(SharedR.string.settings_clear_diagnostics_description),
                 onClick = viewModel::clearDiagnostics,
             )
             HorizontalDivider(color = DyBorder.copy(alpha = 0.6f))
@@ -395,14 +443,14 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 ActionRow(
                     icon = Icons.Filled.Description,
                     tint = DyCyan,
-                    title = "查看发布说明",
-                    description = "在 GitHub 查看更新内容或手动下载",
+                    title = stringResource(SharedR.string.settings_view_release_title),
+                    description = stringResource(SharedR.string.settings_view_release_description),
                     onClick = { openReleasePage(context, updateRelease.htmlUrl) },
                 )
             }
         }
 
-        SettingsSection(title = "关于 ClipCove") {
+        SettingsSection(title = stringResource(SharedR.string.settings_about_title)) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(14.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -412,16 +460,20 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 Column(Modifier.weight(1f)) {
                     Text("ClipCove", style = MaterialTheme.typography.titleLarge, color = DyText)
                     Text(
-                        "v${viewModel.versionName} · build ${viewModel.versionCode}",
+                        stringResource(
+                            SharedR.string.settings_version_line,
+                            viewModel.versionName,
+                            viewModel.versionCode,
+                        ),
                         style = MaterialTheme.typography.bodySmall,
                         color = DyTextSecondary,
                     )
                 }
-                DyPill("本地处理", DyGreen)
+                DyPill(stringResource(SharedR.string.settings_on_device_badge), DyGreen)
             }
             HorizontalDivider(color = DyBorder.copy(alpha = 0.6f))
             Text(
-                "支持抖音与小红书的链接解析、原片优先、画质来源提示、图集 / 原声下载、本地收藏和局域网传输。仅用于个人学习，请尊重版权与平台规则。",
+                stringResource(SharedR.string.settings_about_description),
                 style = MaterialTheme.typography.bodySmall,
                 color = DyTextSecondary,
                 modifier = Modifier.padding(14.dp),
@@ -431,8 +483,8 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             ActionRow(
                 icon = Icons.Filled.Description,
                 tint = DyCyan,
-                title = "查看更新日志",
-                description = "只看当前版本的简要变化",
+                title = stringResource(SharedR.string.settings_changelog_title),
+                description = stringResource(SharedR.string.settings_changelog_description),
                 onClick = { showChangelog = true },
             )
         }
@@ -444,7 +496,11 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
         ) {
             Icon(Icons.Filled.Info, contentDescription = null, tint = DyTextSecondary, modifier = Modifier.size(14.dp))
             Spacer(Modifier.width(5.dp))
-            Text("所有解析都在本机完成", style = MaterialTheme.typography.bodySmall, color = DyTextSecondary)
+            Text(
+                stringResource(SharedR.string.settings_all_local),
+                style = MaterialTheme.typography.bodySmall,
+                color = DyTextSecondary,
+            )
         }
     }
 
@@ -453,10 +509,15 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             onDismissRequest = { showClearAllConfirm = false },
             containerColor = DyCard,
             icon = { Icon(Icons.Filled.DeleteForever, contentDescription = null, tint = DyRed) },
-            title = { Text("清空全部本地数据？", color = DyText) },
+            title = {
+                Text(
+                    stringResource(SharedR.string.settings_clear_all_dialog_title),
+                    color = DyText,
+                )
+            },
             text = {
                 Text(
-                    "这会删除解析历史、收藏、应用内下载任务与文件、以及诊断记录。已经保存到系统「下载」目录的文件不会被删除。此操作无法撤销。",
+                    stringResource(SharedR.string.settings_clear_all_dialog_description),
                     color = DyTextSecondary,
                 )
             },
@@ -466,28 +527,86 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                         showClearAllConfirm = false
                         viewModel.clearAllLocalData()
                     },
-                ) { Text("确认清空", color = DyRed) }
+                ) {
+                    Text(stringResource(SharedR.string.settings_clear_all_confirm), color = DyRed)
+                }
             },
             dismissButton = {
                 TextButton(onClick = { showClearAllConfirm = false }) {
-                    Text("取消", color = DyTextSecondary)
+                    Text(stringResource(SharedR.string.action_cancel), color = DyTextSecondary)
                 }
             },
         )
     }
 
+    if (showLanguageDialog) {
+        AlertDialog(
+            onDismissRequest = { showLanguageDialog = false },
+            containerColor = DyCard,
+            icon = { Icon(Icons.Filled.Language, contentDescription = null, tint = DyCyan) },
+            title = {
+                Text(
+                    stringResource(SharedR.string.language_dialog_title),
+                    color = DyText,
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    AppLanguage.entries.forEach { option ->
+                        val selected = option == appLanguage
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .dyPressable(pressedScale = 0.985f) {
+                                    viewModel.setAppLanguage(option)
+                                    showLanguageDialog = false
+                                    (context as? Activity)?.recreate()
+                                }
+                                .padding(horizontal = 8.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            RadioButton(
+                                selected = selected,
+                                onClick = {
+                                    viewModel.setAppLanguage(option)
+                                    showLanguageDialog = false
+                                    (context as? Activity)?.recreate()
+                                },
+                            )
+                            Text(languageLabel(option), color = DyText)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showLanguageDialog = false }) {
+                    Text(stringResource(SharedR.string.action_close), color = DyRed)
+                }
+            },
+        )
+    }
     if (showChangelog) {
-        val changelog = remember {
+        val languageCode = context.resources.configuration.locales[0].language
+        val changelogAsset = if (languageCode == "zh") "changelog_zh.md" else "changelog.md"
+        val loadFailed = stringResource(SharedR.string.settings_changelog_load_failed)
+        val changelog = remember(changelogAsset, loadFailed) {
             try {
-                context.assets.open("changelog.md").bufferedReader().use { it.readText() }
-            } catch (e: Exception) {
-                "更新日志加载失败"
+                context.assets.open(changelogAsset).bufferedReader().use { it.readText() }
+            } catch (_: Exception) {
+                loadFailed
             }
         }
         AlertDialog(
             onDismissRequest = { showChangelog = false },
             containerColor = DyCard,
-            title = { Text("更新日志", style = MaterialTheme.typography.titleLarge, color = DyText) },
+            title = {
+                Text(
+                    stringResource(SharedR.string.settings_changelog_dialog_title),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = DyText,
+                )
+            },
             text = {
                 Text(
                     changelog,
@@ -497,7 +616,9 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 )
             },
             confirmButton = {
-                TextButton(onClick = { showChangelog = false }) { Text("关闭", color = DyRed) }
+                TextButton(onClick = { showChangelog = false }) {
+                    Text(stringResource(SharedR.string.action_close), color = DyRed)
+                }
             },
         )
     }
@@ -575,33 +696,59 @@ private fun AppRelease.hasInstallableAssets(): Boolean =
 private fun AppRelease.apkSizeBytes(): Long =
     assets.firstOrNull { it.name.endsWith(".apk", ignoreCase = true) }?.sizeBytes ?: 0L
 
+@Composable
 private fun updateActionTitle(state: UpdateUiState): String = when (state) {
-    UpdateUiState.Idle -> "检查更新"
-    UpdateUiState.Checking -> "正在检查更新"
-    UpdateUiState.UpToDate -> "已是最新版本"
-    is UpdateUiState.Available -> "发现新版本 ${state.release.tagName}"
-    is UpdateUiState.Downloading -> if (state.progress > 0) "正在下载更新 ${state.progress}%" else "正在选择更新线路"
-    is UpdateUiState.PermissionRequired -> "需要安装权限"
-    is UpdateUiState.InstallReady -> "安装器已打开"
-    is UpdateUiState.Failed -> if (state.release != null) "更新失败，点按重试" else "重新检查更新"
+    UpdateUiState.Idle -> stringResource(SharedR.string.update_title_idle)
+    UpdateUiState.Checking -> stringResource(SharedR.string.update_title_checking)
+    UpdateUiState.UpToDate -> stringResource(SharedR.string.update_title_current)
+    is UpdateUiState.Available -> stringResource(
+        SharedR.string.update_title_available,
+        state.release.tagName,
+    )
+    is UpdateUiState.Downloading -> if (state.progress > 0) {
+        stringResource(SharedR.string.update_title_downloading_progress, state.progress)
+    } else {
+        stringResource(SharedR.string.update_title_downloading_probe)
+    }
+    is UpdateUiState.PermissionRequired -> stringResource(SharedR.string.update_title_permission)
+    is UpdateUiState.InstallReady -> stringResource(SharedR.string.update_title_installer)
+    is UpdateUiState.Failed -> if (state.release != null) {
+        stringResource(SharedR.string.update_title_failed_retry)
+    } else {
+        stringResource(SharedR.string.update_title_failed_recheck)
+    }
 }
 
+@Composable
 private fun updateActionDescription(state: UpdateUiState, autoUpdateMirrors: Boolean): String = when (state) {
-    UpdateUiState.Idle -> "手动查询 GitHub Releases，不会在后台自动访问"
-    UpdateUiState.Checking -> "正在连接 GitHub，请稍候…"
-    UpdateUiState.UpToDate -> "当前版本已是 GitHub 上可用的最新版本"
+    UpdateUiState.Idle -> stringResource(SharedR.string.update_description_idle)
+    UpdateUiState.Checking -> stringResource(SharedR.string.update_description_checking)
+    UpdateUiState.UpToDate -> stringResource(SharedR.string.update_description_current)
     is UpdateUiState.Available -> {
         val size = state.release.apkSizeBytes()
-        val sizeHint = if (size > 0) "（约 ${formatUpdateSize(size)}）" else ""
-        val routeHint = if (autoUpdateMirrors) "会自动探测可用加速线路。" else ""
-        "点按自动下载并校验 APK$sizeHint，随后打开系统安装器。建议连接 WiFi。$routeHint"
+        val sizeHint = if (size > 0) {
+            stringResource(SharedR.string.update_available_size, formatUpdateSize(size))
+        } else {
+            ""
+        }
+        val routeHint = if (autoUpdateMirrors) {
+            stringResource(SharedR.string.update_available_mirror_hint)
+        } else {
+            ""
+        }
+        stringResource(SharedR.string.update_description_available, sizeHint, routeHint)
     }
-    is UpdateUiState.Downloading -> if (state.progress > 0) "正在应用内下载更新，请保持网络连接。" else "正在并发探测可用线路，找到后会立即开始下载。"
-    is UpdateUiState.PermissionRequired -> "请在系统页面允许 ClipCove 安装未知应用，然后返回本页再次点按。"
-    is UpdateUiState.InstallReady -> "请按系统安装页提示完成升级；页面关闭后可再次点按。"
-    is UpdateUiState.Failed -> {
-        val retry = if (state.release != null) "点按重试。" else "点按重新检查。"
-        "${state.message.take(120)}。$retry"
+    is UpdateUiState.Downloading -> if (state.progress > 0) {
+        stringResource(SharedR.string.update_description_downloading)
+    } else {
+        stringResource(SharedR.string.update_description_probing)
+    }
+    is UpdateUiState.PermissionRequired -> stringResource(SharedR.string.update_description_permission)
+    is UpdateUiState.InstallReady -> stringResource(SharedR.string.update_description_installer)
+    is UpdateUiState.Failed -> if (state.release != null) {
+        stringResource(SharedR.string.update_description_failed_retry)
+    } else {
+        stringResource(SharedR.string.update_description_failed_recheck)
     }
 }
 
@@ -618,7 +765,11 @@ private fun openReleasePage(context: Context, url: String) {
     runCatching {
         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(safeUrl)))
     }.onFailure {
-        Toast.makeText(context, "无法打开浏览器", Toast.LENGTH_SHORT).show()
+        Toast.makeText(
+            context,
+            context.getString(SharedR.string.settings_open_browser_failed),
+            Toast.LENGTH_SHORT,
+        ).show()
     }
 }
 
@@ -631,11 +782,20 @@ private fun exportBackup(context: Context, viewModel: SettingsViewModel) {
             content = viewModel.exportData(),
             filename = filename,
             mimeType = "application/json",
-            chooserTitle = "分享备份",
+            chooserTitle = context.getString(SharedR.string.settings_share_backup),
         )
-        Toast.makeText(context, "备份已导出：$filename", Toast.LENGTH_LONG).show()
-    } catch (e: Exception) {
-        Toast.makeText(context, "导出失败：${e.message}", Toast.LENGTH_LONG).show()
+        Toast.makeText(
+            context,
+            context.getString(SharedR.string.settings_backup_exported, filename),
+            Toast.LENGTH_LONG,
+        ).show()
+    } catch (error: Exception) {
+        val message = if (error is SecurityException) {
+            SharedR.string.settings_storage_permission_export
+        } else {
+            SharedR.string.settings_export_failed
+        }
+        Toast.makeText(context, context.getString(message), Toast.LENGTH_LONG).show()
     }
 }
 
@@ -647,11 +807,20 @@ private fun exportDiagnostics(context: Context, viewModel: SettingsViewModel) {
             content = viewModel.exportDiagnostics(),
             filename = filename,
             mimeType = "text/plain",
-            chooserTitle = "分享诊断报告",
+            chooserTitle = context.getString(SharedR.string.settings_share_diagnostics),
         )
-        Toast.makeText(context, "诊断报告已导出：$filename", Toast.LENGTH_LONG).show()
-    } catch (e: Exception) {
-        Toast.makeText(context, "导出失败：${e.message}", Toast.LENGTH_LONG).show()
+        Toast.makeText(
+            context,
+            context.getString(SharedR.string.settings_diagnostics_exported, filename),
+            Toast.LENGTH_LONG,
+        ).show()
+    } catch (error: Exception) {
+        val message = if (error is SecurityException) {
+            SharedR.string.settings_storage_permission_export
+        } else {
+            SharedR.string.settings_export_failed
+        }
+        Toast.makeText(context, context.getString(message), Toast.LENGTH_LONG).show()
     }
 }
 
@@ -672,10 +841,10 @@ private fun exportTextFile(
         val contentUri = context.contentResolver.insert(
             MediaStore.Downloads.EXTERNAL_CONTENT_URI,
             values,
-        ) ?: throw RuntimeException("无法创建导出文件")
+        ) ?: throw IllegalStateException()
         context.contentResolver.openOutputStream(contentUri)?.use {
             it.write(content.toByteArray(Charsets.UTF_8))
-        } ?: throw RuntimeException("写入导出文件失败")
+        } ?: throw IllegalStateException()
         contentUri
     } else {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) !=
@@ -685,7 +854,7 @@ private fun exportTextFile(
                 arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE),
                 REQUEST_WRITE_STORAGE,
             )
-            throw RuntimeException("请允许存储权限后再次导出")
+            throw SecurityException()
         }
         val file = File(
             Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
@@ -704,3 +873,15 @@ private fun exportTextFile(
 }
 
 private const val REQUEST_WRITE_STORAGE = 202
+
+
+
+
+
+/** Returns the localized label for an app-language choice. */
+@Composable
+private fun languageLabel(language: AppLanguage): String = when (language) {
+    AppLanguage.SYSTEM -> stringResource(SharedR.string.language_system)
+    AppLanguage.ENGLISH -> stringResource(SharedR.string.language_english)
+    AppLanguage.CHINESE -> stringResource(SharedR.string.language_chinese)
+}

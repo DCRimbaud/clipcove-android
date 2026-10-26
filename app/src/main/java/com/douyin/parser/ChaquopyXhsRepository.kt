@@ -1,3 +1,10 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * Copyright (c) 2026 DCRimbaud
+ * Author: DCRimbaud
+ *
+ * Fetches Xiaohongshu pages through Chaquopy and delegates SSR normalization to the data layer.
+ */
 package com.douyin.parser
 
 import android.util.Log
@@ -13,8 +20,8 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 /**
- * 小红书适配器：Python 只负责抓取官方页面，SSR 映射仍由 data:xhs 的 Kotlin 解析器完成。
- * 这样既能使用 Android 上更稳定的 Python 网络栈，也能继续对解析逻辑做 JVM 单测。
+ * Xiaohongshu adapter: Python fetches only the official page; SSR normalization remains in data:xhs Kotlin code.
+ * This keeps the more reliable Android Python network stack while preserving JVM testability for parsing.
  */
 class ChaquopyXhsRepository : XhsRepository {
 

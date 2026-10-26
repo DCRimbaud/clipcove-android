@@ -1,5 +1,13 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * Copyright (c) 2026 DCRimbaud
+ * Author: DCRimbaud
+ *
+ * Android activity shell that hosts navigation, shared repositories, and intent handoff.
+ */
 package com.douyin.parser
 
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -42,6 +50,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -60,8 +69,10 @@ import com.douyin.core.designsystem.DyTextSecondary
 import com.douyin.core.designsystem.DyTheme
 import com.douyin.core.designsystem.dyPressable
 import com.douyin.core.model.MediaPlatform
+import com.douyin.core.uiresources.R as SharedR
 import com.douyin.data.download.DownloadRepository
 import com.douyin.data.favorites.FavoritesRepository
+import com.douyin.data.settings.withAppLanguage
 import com.douyin.feature.downloads.DownloadsScreen
 import com.douyin.feature.favorites.FavoritesScreen
 import com.douyin.feature.home.HomeScreen
@@ -69,8 +80,12 @@ import com.douyin.feature.settings.SettingsScreen
 import org.koin.android.ext.android.inject
 import org.koin.androidx.compose.koinViewModel
 
-/** 应用壳：渐变背景、底部导航与页面路由。 */
+/** Activity shell that owns the ambient background, bottom navigation, and route graph. */
 class MainActivity : ComponentActivity() {
+
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(newBase.withAppLanguage())
+    }
 
     private val downloadRepository: DownloadRepository by inject()
     private val favoritesRepository: FavoritesRepository by inject()
@@ -119,15 +134,15 @@ class MainActivity : ComponentActivity() {
 
 private data class Dest(
     val route: String,
-    val label: String,
+    val labelRes: Int,
     val icon: ImageVector,
 )
 
 private val destinations = listOf(
-    Dest("home", "首页", Icons.Filled.Home),
-    Dest("favorites", "收藏", Icons.Filled.Favorite),
-    Dest("downloads", "下载", Icons.Filled.Download),
-    Dest("settings", "设置", Icons.Filled.Settings),
+    Dest("home", SharedR.string.nav_home, Icons.Filled.Home),
+    Dest("favorites", SharedR.string.nav_favorites, Icons.Filled.Favorite),
+    Dest("downloads", SharedR.string.nav_downloads, Icons.Filled.Download),
+    Dest("settings", SharedR.string.nav_settings, Icons.Filled.Settings),
 )
 
 @Composable
@@ -234,16 +249,25 @@ private fun DyNavHost(
                     onToggleFavorite = vm::toggleFavorite,
                     onShareResult = {
                         result?.let { media ->
+                            val platformName = context.getString(
+                                if (media.platform == MediaPlatform.XIAOHONGSHU) {
+                                    SharedR.string.platform_xiaohongshu
+                                } else {
+                                    SharedR.string.platform_douyin
+                                },
+                            )
                             val text = buildString {
-                                append("【${media.platform.displayName}】${media.title}\n")
-                                append("作者：@${media.author}\n")
-                                append("ID：${media.id}")
+                                append(context.getString(SharedR.string.share_platform_title, platformName, media.title))
+                                append(context.getString(SharedR.string.share_author, media.author))
+                                append(context.getString(SharedR.string.share_id, media.id))
                             }
                             val share = Intent(Intent.ACTION_SEND).apply {
                                 type = "text/plain"
                                 putExtra(Intent.EXTRA_TEXT, text)
                             }
-                            context.startActivity(Intent.createChooser(share, "分享到"))
+                            context.startActivity(
+                                Intent.createChooser(share, context.getString(SharedR.string.share_chooser))
+                            )
                         }
                     },
                 )
@@ -301,6 +325,7 @@ private fun DyBottomNavigation(
                 horizontalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 destinations.forEach { dest ->
+                    val label = stringResource(dest.labelRes)
                     val selected = currentRoute == dest.route
                     val background by animateColorAsState(
                         targetValue = if (selected) DyRed.copy(alpha = 0.16f) else Color.Transparent,
@@ -333,7 +358,7 @@ private fun DyBottomNavigation(
                     ) {
                         Icon(
                             dest.icon,
-                            contentDescription = dest.label,
+                            contentDescription = label,
                             tint = iconTint,
                             modifier = Modifier
                                 .size(21.dp)
@@ -344,7 +369,7 @@ private fun DyBottomNavigation(
                         )
                         Spacer(Modifier.height(3.dp))
                         Text(
-                            dest.label,
+                            label,
                             color = labelTint,
                             fontSize = 10.sp,
                             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,

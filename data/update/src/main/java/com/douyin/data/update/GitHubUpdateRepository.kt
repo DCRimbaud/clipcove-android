@@ -1,3 +1,10 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * Copyright (c) 2026 DCRimbaud
+ * Author: DCRimbaud
+ *
+ * Reads GitHub release metadata with direct and proxy fallbacks.
+ */
 package com.douyin.data.update
 
 import kotlinx.coroutines.Dispatchers
@@ -91,6 +98,7 @@ class GitHubUpdateRepository(
             "https://api.github.com/repos/DCRimbaud/clipcove-android/releases?per_page=30"
         const val MAX_NOTES_LENGTH = 20_000
 
+        /** Creates a short-lived client for bounded release metadata requests. */
         fun defaultClient(): OkHttpClient = OkHttpClient.Builder()
             .connectTimeout(6, TimeUnit.SECONDS)
             .readTimeout(10, TimeUnit.SECONDS)

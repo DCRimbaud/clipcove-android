@@ -1,3 +1,10 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * Copyright (c) 2026 DCRimbaud
+ * Author: DCRimbaud
+ *
+ * Mirrors completed app-private downloads into the public Downloads collection and owns retry/deduplication policy.
+ */
 package com.douyin.parser
 
 import android.content.Context
@@ -17,11 +24,11 @@ import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * 自动另存服务:订阅下载任务流,完成后若开启「自动保存到下载」,
- * 将文件保存到公共 Downloads 目录(MediaStore,无需权限)。
+ * Auto-save service: observes completed downloads and mirrors them when enabled.
+ * Files are written through MediaStore on Android 10+ and require no runtime permission there.
  *
- * 线程安全:已保存任务用 ConcurrentHashMap 去重,防止任务流重复触发产生重复文件;
- * 阻塞 IO 在独立 Job 中执行,不被 collect 重启打断。
+ * Thread safety: ConcurrentHashMap deduplicates completed tasks so repeated flow emissions cannot copy twice.
+ * Blocking file I/O runs in child jobs and is not interrupted by task-flow restarts.
  */
 class AutoSaveService(
     private val context: Context,
@@ -30,13 +37,14 @@ class AutoSaveService(
 ) {
     private val scope = CoroutineScope(Dispatchers.IO)
     private val saved = ConcurrentHashMap.newKeySet<Long>()
-    /** 失败重试次数上限(防止永久性失败无限重试) */
+    /** Maximum copy attempts before a permanently failing task is abandoned. */
     private val failCount = ConcurrentHashMap<Long, Int>()
     private var collectJob: Job? = null
     @Volatile
     private var autoSaveEnabled = true
     private val maxRetries = 3
 
+    /** Starts settings and task observers once; repeated calls are ignored. */
     fun start() {
         if (collectJob != null) return
         collectJob = scope.launch {
@@ -50,12 +58,12 @@ class AutoSaveService(
                     it.status == DownloadStatus.DONE && !it.savedToPublic && saved.add(it.id)
                 }
                 toSave.forEach { task ->
-                    // 阻塞 IO 在独立 Job,不阻塞 collect 流
-                    scope.launch {
+                    // Run blocking I/O outside the task-flow collector.
+                    scope.launch saveTask@{
                         try {
                             if (!autoSaveEnabled) {
                                 saved.remove(task.id)
-                                return@launch
+                                return@saveTask
                             }
                             saveToPublic(task)
                             task.savedToPublic = true
@@ -65,7 +73,7 @@ class AutoSaveService(
                             val count = (failCount[task.id] ?: 0) + 1
                             failCount[task.id] = count
                             if (count >= maxRetries) {
-                                // 放弃:标记已处理,避免无限重试
+                                // Mark the task as handled after the retry budget is exhausted.
                                 saved.add(task.id)
                             }
                         }

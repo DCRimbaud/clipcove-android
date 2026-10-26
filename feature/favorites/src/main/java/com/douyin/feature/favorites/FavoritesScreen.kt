@@ -1,3 +1,10 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * Copyright (c) 2026 DCRimbaud
+ * Author: DCRimbaud
+ *
+ * Renders favorite search, source-link actions, removal, and empty states.
+ */
 package com.douyin.feature.favorites
 
 import android.content.ClipData
@@ -50,6 +57,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.douyin.core.designsystem.DyMotion
@@ -68,12 +76,19 @@ import com.douyin.core.designsystem.DySurfaceHigh
 import com.douyin.core.designsystem.DyTextSecondary
 import com.douyin.core.model.MediaPlatform
 import com.douyin.data.favorites.FavoriteItem
+import com.douyin.core.uiresources.R as SharedR
 import com.douyin.data.favorites.FavoritesRepository
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 @Composable
+/**
+ * Renders locally persisted favorites with search and source-link actions.
+ *
+ * The screen reloads after removal and never performs remote resolution unless
+ * the caller chooses to reopen an item.
+ */
 fun FavoritesScreen(
     repository: FavoritesRepository,
     onOpen: (FavoriteItem) -> Unit,
@@ -93,18 +108,23 @@ fun FavoritesScreen(
         modifier = Modifier.fillMaxSize().padding(start = 18.dp, end = 18.dp, top = 14.dp),
     ) {
         DyPageHeader(
-            title = "收藏",
-            subtitle = "把值得重看的内容留在手边。",
-            eyebrow = "FAVORITES",
-            trailing = { DyPill(text = "${items.size} 项", color = DyRed) },
+            title = stringResource(SharedR.string.nav_favorites),
+            subtitle = stringResource(SharedR.string.favorites_subtitle),
+            eyebrow = stringResource(SharedR.string.nav_favorites),
+            trailing = {
+                DyPill(
+                    text = stringResource(SharedR.string.unit_items, items.size),
+                    color = DyRed,
+                )
+            },
         )
         Spacer(Modifier.height(16.dp))
 
         if (items.isEmpty()) {
             DyEmptyState(
                 icon = Icons.Filled.FavoriteBorder,
-                title = "还没有收藏",
-                description = "解析结果卡片上点一次爱心，作品就会出现在这里。",
+                title = stringResource(SharedR.string.favorites_empty_title),
+                description = stringResource(SharedR.string.favorites_empty_description),
             )
         } else {
             OutlinedTextField(
@@ -112,14 +132,23 @@ fun FavoritesScreen(
                 onValueChange = { query = it },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                placeholder = { Text("搜索标题、作品 ID 或链接", color = DyTextSecondary) },
+                placeholder = {
+                    Text(
+                        stringResource(SharedR.string.favorites_search_hint),
+                        color = DyTextSecondary,
+                    )
+                },
                 leadingIcon = {
                     Icon(Icons.Filled.Search, contentDescription = null, tint = DyTextSecondary)
                 },
                 trailingIcon = {
                     if (query.isNotBlank()) {
                         IconButton(onClick = { query = "" }) {
-                            Icon(Icons.Filled.Close, contentDescription = "清空搜索", tint = DyTextSecondary)
+                            Icon(
+                                Icons.Filled.Close,
+                                contentDescription = stringResource(SharedR.string.action_clear_search),
+                                tint = DyTextSecondary,
+                            )
                         }
                     }
                 },
@@ -167,8 +196,8 @@ fun FavoritesScreen(
                 if (empty) {
                     DyEmptyState(
                         icon = Icons.Filled.Search,
-                        title = "没有匹配的收藏",
-                        description = "换一个标题、作品 ID 或链接关键词试试。",
+                        title = stringResource(SharedR.string.favorites_no_results_title),
+                        description = stringResource(SharedR.string.favorites_no_results_description),
                     )
                 } else {
                     LazyColumn(
@@ -241,14 +270,25 @@ private fun FavoriteCard(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Spacer(Modifier.height(7.dp))
-                Text("收藏于", style = MaterialTheme.typography.bodySmall, color = DyTextSecondary)
+                Text(
+                    stringResource(SharedR.string.favorites_saved_at),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = DyTextSecondary,
+                )
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(7.dp),
                 ) {
-                    DyPill(if (isXhs) "小红书" else "抖音", platformColor)
+                    DyPill(
+                        if (isXhs) {
+                            stringResource(SharedR.string.platform_xiaohongshu)
+                        } else {
+                            stringResource(SharedR.string.platform_douyin)
+                        },
+                        platformColor,
+                    )
                     Text(
-                        SimpleDateFormat("MM-dd HH:mm", Locale.CHINA).format(Date(item.time)),
+                        SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()).format(Date(item.time)),
                         style = MaterialTheme.typography.bodySmall,
                         color = DyCyan,
                     )
@@ -257,11 +297,19 @@ private fun FavoriteCard(
                     onClick = onCopyLink,
                     contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp),
                 ) {
-                    Text("复制链接", color = platformColor, fontSize = 12.sp)
+                    Text(
+                        stringResource(SharedR.string.action_copy_link),
+                        color = platformColor,
+                        fontSize = 12.sp,
+                    )
                 }
             }
             IconButton(onClick = onRemove) {
-                Icon(Icons.Filled.Favorite, contentDescription = "取消收藏", tint = DyRed)
+                Icon(
+                    Icons.Filled.Favorite,
+                    contentDescription = stringResource(SharedR.string.favorites_remove),
+                    tint = DyRed,
+                )
             }
         }
     }
@@ -279,5 +327,9 @@ private fun copyFavoriteLink(context: Context, item: FavoriteItem) {
     val link = item.sourceUrl.ifBlank { fallback }
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     clipboard.setPrimaryClip(ClipData.newPlainText("ClipCove link", link))
-    Toast.makeText(context, "已复制源链接", Toast.LENGTH_SHORT).show()
+    Toast.makeText(
+        context,
+        context.getString(SharedR.string.favorites_link_copied),
+        Toast.LENGTH_SHORT,
+    ).show()
 }

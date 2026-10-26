@@ -1,10 +1,8 @@
-"""可选联网冒烟测试：直接验证当前平台的解析链路。
+"""Optional live-network smoke checks for platform parsing infrastructure.
 
-用法（Windows，在仓库根目录）：
-    $env:PYTHONPATH = "app/src/main/python"
-    python tools/smoke_network.py
-
-该脚本依赖外部平台，可能因网络、风控或作品失效而失败，不进入普通 CI。
+SPDX-License-Identifier: GPL-3.0-only
+Copyright (c) 2026 DCRimbaud
+Author: DCRimbaud
 """
 
 from __future__ import annotations
@@ -30,6 +28,7 @@ UA = (
 
 
 def check_douyin() -> None:
+    """Run one optional live Douyin resolver smoke check."""
     sample = os.getenv("DOUYIN_SMOKE_INPUT", "7345492945006595379")
     result = json.loads(resolve_douyin(sample))
     if result.get("error"):
@@ -40,6 +39,7 @@ def check_douyin() -> None:
 
 
 def check_xiaohongshu() -> None:
+    """Fetch a live Xiaohongshu note and verify the SSR payload is present."""
     session = requests.Session()
     session.headers.update({"User-Agent": UA, "Accept-Language": "zh-CN,zh;q=0.9"})
     supplied = os.getenv("XHS_SMOKE_URL")
@@ -67,6 +67,7 @@ def check_xiaohongshu() -> None:
 
 
 def main() -> int:
+    """Run all optional platform smoke checks and return a process exit code."""
     failed = False
     for name, check in (("douyin", check_douyin), ("xiaohongshu", check_xiaohongshu)):
         try:
