@@ -22,14 +22,19 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 
 /** Downloads a published APK in-app, verifies it, and opens Android's installer. */
 class AndroidUpdateInstaller(
@@ -53,6 +58,14 @@ class AndroidUpdateInstaller(
             .connectTimeout(6, TimeUnit.SECONDS)
             .readTimeout(10, TimeUnit.SECONDS)
             .callTimeout(15, TimeUnit.SECONDS)
+            .build()
+    }
+
+    private val chunkClient by lazy {
+        client.newBuilder()
+            .connectTimeout(12, TimeUnit.SECONDS)
+            .readTimeout(90, TimeUnit.SECONDS)
+            .callTimeout(3, TimeUnit.MINUTES)
             .build()
     }
 
@@ -89,6 +102,7 @@ class AndroidUpdateInstaller(
                 destination = apkFile,
                 partFile = partFile,
                 allowMirrors = allowMirrors,
+                expectedHash = expectedHash,
                 onProgress = onProgress,
             )
         }
@@ -161,15 +175,36 @@ class AndroidUpdateInstaller(
         destination: File,
         partFile: File,
         allowMirrors: Boolean,
+        expectedHash: String,
         onProgress: (Int) -> Unit,
     ) {
         var lastError: Exception? = null
+        val giteeManifest = UpdateDownloadRoutes.giteeChunkManifest(asset.downloadUrl)
+        if (allowMirrors && giteeManifest != null) {
+            try {
+                downloadGiteeChunks(
+                    asset = asset,
+                    manifestUrl = giteeManifest,
+                    destination = destination,
+                    partFile = partFile,
+                    expectedHash = expectedHash,
+                    onProgress = onProgress,
+                )
+                cleanupGiteeChunks(partFile)
+                return
+            } catch (error: Exception) {
+                lastError = error
+                partFile.delete()
+                Log.w(TAG, "Gitee chunk mirror unavailable; falling back", error)
+            }
+        }
         val routes = orderRoutes(UpdateDownloadRoutes.candidates(asset.downloadUrl, allowMirrors))
         for (url in routes) {
             var attempt = 0
             while (attempt <= MAX_RETRIES_PER_SOURCE) {
                 try {
                     downloadAttempt(asset, url, destination, partFile, onProgress)
+                    cleanupGiteeChunks(partFile)
                     return
                 } catch (error: Exception) {
                     lastError = error
@@ -182,6 +217,199 @@ class AndroidUpdateInstaller(
         throw UpdateException(
             "所有下载线路均失败，请切换网络后重试，或在设置中开启更新加速线路"
         ).also { error -> lastError?.let(error::initCause) }
+    }
+
+    private suspend fun downloadGiteeChunks(
+        asset: ReleaseAsset,
+        manifestUrl: String,
+        destination: File,
+        partFile: File,
+        expectedHash: String,
+        onProgress: (Int) -> Unit,
+    ) = withContext(Dispatchers.IO) {
+        val manifest = fetchGiteeManifest(manifestUrl, asset, expectedHash)
+        val chunkDir = File(partFile.parentFile, partFile.name + ".gitee-parts").apply { mkdirs() }
+        val existingBytes = manifest.parts.sumOf { part ->
+            File(chunkDir, part.name).takeIf { it.isFile && it.length() == part.sizeBytes }?.length() ?: 0L
+        }
+        ensureStorageAvailable(chunkDir, (manifest.totalBytes - existingBytes) + manifest.totalBytes, 0L)
+        val completedBytes = AtomicLong(existingBytes)
+        val lastProgress = AtomicInteger(-1)
+        val semaphore = Semaphore(GITEE_CHUNK_PARALLEL)
+
+        coroutineScope {
+            manifest.parts.map { part ->
+                async(Dispatchers.IO) {
+                    semaphore.withPermit {
+                        downloadGiteeChunk(
+                            part = part,
+                            manifestUrl = manifestUrl,
+                            chunkDir = chunkDir,
+                            totalBytes = manifest.totalBytes,
+                            completedBytes = completedBytes,
+                            lastProgress = lastProgress,
+                            onProgress = onProgress,
+                        )
+                    }
+                }
+            }.awaitAll()
+        }
+
+        assembleGiteeChunks(manifest.parts, chunkDir, partFile)
+        if (partFile.length() != manifest.totalBytes) {
+            throw IOException("Gitee chunk total size mismatch")
+        }
+        if (UpdatePackageVerifier.sha256(partFile) != expectedHash) {
+            partFile.delete()
+            throw IOException("Gitee chunk checksum mismatch")
+        }
+        movePartToDestination(partFile, destination)
+        onProgress(100)
+    }
+
+    private fun fetchGiteeManifest(
+        manifestUrl: String,
+        asset: ReleaseAsset,
+        expectedHash: String,
+    ): GiteeChunkManifest {
+        val request = Request.Builder()
+            .url(manifestUrl)
+            .header("User-Agent", USER_AGENT)
+            .get()
+            .build()
+        val raw = probeClient.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) throw HttpStatusException(response.code)
+            response.body?.string().orEmpty()
+        }
+        if (raw.isBlank()) throw IOException("Empty Gitee chunk manifest")
+        return parseGiteeManifest(raw, manifestUrl, asset, expectedHash)
+    }
+
+    private fun parseGiteeManifest(
+        raw: String,
+        manifestUrl: String,
+        asset: ReleaseAsset,
+        expectedHash: String,
+    ): GiteeChunkManifest {
+        val root = JSONObject(raw)
+        if (root.optInt("format") != GITEE_MANIFEST_FORMAT) {
+            throw IOException("Unsupported Gitee chunk manifest")
+        }
+        if (!root.optString("asset").equals(asset.name, ignoreCase = true)) {
+            throw IOException("Gitee manifest asset name mismatch")
+        }
+        val totalBytes = root.optLong("size")
+        if (totalBytes <= 0 || (asset.sizeBytes > 0 && totalBytes != asset.sizeBytes)) {
+            throw IOException("Gitee manifest size mismatch")
+        }
+        val manifestHash = root.optString("sha256")
+        if (!manifestHash.equals(expectedHash, ignoreCase = true)) {
+            throw IOException("Gitee manifest checksum mismatch")
+        }
+        val array = root.optJSONArray("parts") ?: throw IOException("Missing Gitee chunks")
+        val parts = buildList {
+            for (index in 0 until array.length()) {
+                val item = array.optJSONObject(index) ?: continue
+                val name = item.optString("name")
+                val size = item.optLong("size")
+                if (UpdateDownloadRoutes.giteeChunkUrl(manifestUrl, name) == null || size <= 0) {
+                    throw IOException("Invalid Gitee chunk entry")
+                }
+                add(GiteeChunkPart(name = name, sizeBytes = size))
+            }
+        }
+        if (parts.isEmpty() || parts.map { it.name }.distinct().size != parts.size) {
+            throw IOException("Invalid Gitee chunk list")
+        }
+        if (parts.sumOf { it.sizeBytes } != totalBytes) {
+            throw IOException("Gitee chunk sizes do not add up")
+        }
+        return GiteeChunkManifest(totalBytes = totalBytes, parts = parts)
+    }
+
+    private fun downloadGiteeChunk(
+        part: GiteeChunkPart,
+        manifestUrl: String,
+        chunkDir: File,
+        totalBytes: Long,
+        completedBytes: AtomicLong,
+        lastProgress: AtomicInteger,
+        onProgress: (Int) -> Unit,
+    ) {
+        val target = File(chunkDir, part.name)
+        if (target.isFile && target.length() == part.sizeBytes) return
+        if (target.exists()) target.delete()
+
+        val url = UpdateDownloadRoutes.giteeChunkUrl(manifestUrl, part.name)
+            ?: throw IOException("Unsafe Gitee chunk URL")
+        var lastError: Exception? = null
+        repeat(GITEE_CHUNK_ATTEMPTS) { attempt ->
+            try {
+                downloadGiteeChunkOnce(
+                    url = url,
+                    target = target,
+                    expectedBytes = part.sizeBytes,
+                )
+                val done = completedBytes.addAndGet(part.sizeBytes)
+                val percent = ((done * 100L) / totalBytes).toInt().coerceIn(0, 100)
+                if (lastProgress.getAndSet(percent) != percent) onProgress(percent)
+                return
+            } catch (error: Exception) {
+                lastError = error
+                target.delete()
+                if (attempt + 1 < GITEE_CHUNK_ATTEMPTS) Thread.sleep(500L * (attempt + 1))
+            }
+        }
+        throw lastError ?: IOException("Gitee chunk download failed")
+    }
+
+    private fun downloadGiteeChunkOnce(
+        url: String,
+        target: File,
+        expectedBytes: Long,
+    ) {
+        val temp = File(target.parentFile, target.name + ".download")
+        temp.delete()
+        val request = Request.Builder()
+            .url(url)
+            .header("User-Agent", USER_AGENT)
+            .get()
+            .build()
+        try {
+            chunkClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) throw HttpStatusException(response.code)
+                val body = response.body ?: throw IOException("Empty Gitee chunk body")
+                FileOutputStream(temp, false).use { output ->
+                    body.byteStream().use { input ->
+                        val buffer = ByteArray(64 * 1024)
+                        while (true) {
+                            val read = input.read(buffer)
+                            if (read < 0) break
+                            output.write(buffer, 0, read)
+                        }
+                    }
+                }
+            }
+            if (temp.length() != expectedBytes) throw IOException("Gitee chunk size mismatch")
+            if (!temp.renameTo(target)) {
+                temp.copyTo(target, overwrite = true)
+                temp.delete()
+            }
+        } finally {
+            temp.delete()
+        }
+    }
+
+    private fun assembleGiteeChunks(parts: List<GiteeChunkPart>, chunkDir: File, partFile: File) {
+        FileOutputStream(partFile, false).use { output ->
+            parts.forEach { part ->
+                File(chunkDir, part.name).inputStream().use { input -> input.copyTo(output) }
+            }
+        }
+    }
+
+    private fun cleanupGiteeChunks(partFile: File) {
+        File(partFile.parentFile, partFile.name + ".gitee-parts").deleteRecursively()
     }
 
     private suspend fun orderRoutes(routes: List<String>): List<String> {
@@ -259,6 +487,12 @@ class AndroidUpdateInstaller(
         val latencyMs: Long,
         val throughputBps: Long,
     )
+
+    /** One publicly readable Gitee chunk referenced by a signed release asset manifest. */
+    private data class GiteeChunkPart(val name: String, val sizeBytes: Long)
+
+    /** Validated chunk total returned by the Gitee mirror. */
+    private data class GiteeChunkManifest(val totalBytes: Long, val parts: List<GiteeChunkPart>)
 
     private fun downloadAttempt(
         asset: ReleaseAsset,
@@ -437,6 +671,9 @@ class AndroidUpdateInstaller(
         const val MAX_RETRIES_PER_SOURCE = 1
         const val PROBE_BYTES = 384 * 1024
         const val PROBE_WINDOW_MS = 2_500L
+        const val GITEE_CHUNK_PARALLEL = 4
+        const val GITEE_CHUNK_ATTEMPTS = 2
+        const val GITEE_MANIFEST_FORMAT = 1
         const val TAG = "ClipCoveUpdate"
         const val USER_AGENT = "ClipCove-Android-Updater"
 

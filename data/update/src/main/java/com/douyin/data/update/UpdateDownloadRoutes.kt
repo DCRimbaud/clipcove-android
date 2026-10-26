@@ -45,11 +45,34 @@ internal object UpdateDownloadRoutes {
         }
         return buildList {
             add(originalUrl)
-            giteeReleaseAsset(originalUrl)?.let(::add)
+            if (originalUrl.endsWith(".sha256", ignoreCase = true)) {
+                giteeReleaseAsset(originalUrl)?.let(::add)
+            }
             prefixes.forEach { prefix ->
                 add(prefix.trimEnd('/') + "/" + originalUrl)
             }
         }.distinct()
+    }
+
+    /**
+     * Returns the small Gitee manifest for chunked APK mirroring.
+     *
+     * The APK itself is deliberately not routed through a public Raw URL because
+     * Gitee requires login for large repository files. Its manifest and 8 MB
+     * chunks remain publicly readable and are assembled after download.
+     */
+    fun giteeChunkManifest(originalUrl: String): String? =
+        giteeReleaseAsset(originalUrl)?.let { "$it.parts.json" }
+
+    /** Resolves one validated chunk name beneath the approved Gitee manifest directory. */
+    fun giteeChunkUrl(manifestUrl: String, chunkName: String): String? {
+        if (!manifestUrl.startsWith(GITEE_ASSET_PREFIX) ||
+            !manifestUrl.endsWith(".parts.json") ||
+            !chunkName.matches(Regex("""[A-Za-z0-9._-]+"""))
+        ) {
+            return null
+        }
+        return manifestUrl.substringBeforeLast('/') + "/" + chunkName
     }
 
     /** Maps canonical ClipCove release assets to the read-only Gitee asset mirror. */
