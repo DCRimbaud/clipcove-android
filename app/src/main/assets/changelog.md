@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.4.0
+
+- Added queue-wide pause, resume, and retry-failed controls for batch downloads.
+- Multi-file downloads now show combined progress in the foreground notification.
+- Fixed failed downloads not retrying until the app was restarted.
 ## 1.3.1
 
 - Added a Gitee mirror download route for faster downloads in mainland China.

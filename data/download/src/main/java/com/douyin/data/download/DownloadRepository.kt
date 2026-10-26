@@ -29,6 +29,18 @@ interface DownloadRepository {
     /** Resumes a paused task from its persisted byte offset. */
     fun resume(task: DownloadTask)
 
+    /** Restarts a failed task from its retained part file. */
+    fun retry(task: DownloadTask)
+
+    /** Pauses every queued or downloading task. */
+    fun pauseAll()
+
+    /** Resumes every paused task. */
+    fun resumeAll()
+
+    /** Restarts every failed task. */
+    fun retryFailed()
+
     /** Removes a task and its private backing files. */
     fun remove(task: DownloadTask)
 }

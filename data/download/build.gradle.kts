@@ -1,4 +1,4 @@
-﻿plugins {
+plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
 }
@@ -16,4 +16,5 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.koin.core)
     implementation(libs.okhttp)
+    testImplementation(libs.junit)
 }

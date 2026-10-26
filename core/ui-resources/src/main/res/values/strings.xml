@@ -49,6 +49,7 @@
     <string name="notification_preparing">Preparing download</string>
     <string name="notification_waiting">%1$s waiting</string>
     <string name="notification_progress">Download progress</string>
+    <string name="notification_queue_progress">%1$d active · %2$d%% overall</string>
 
     <string name="home_header_subtitle">Keep what you love. Locally.</string>
     <string name="home_header_eyebrow">LOCAL MEDIA · PRIVATE</string>
@@ -167,6 +168,9 @@
     <string name="downloads_failed">Failed</string>
     <string name="downloads_search_hint">Search title or filename</string>
     <string name="downloads_clear_completed">Clear completed</string>
+    <string name="downloads_pause_all">Pause all</string>
+    <string name="downloads_resume_all">Resume all</string>
+    <string name="downloads_retry_failed">Retry failed</string>
     <string name="downloads_empty_category">No downloads in this category</string>
     <string name="downloads_no_search_results">No downloads match “%1$s”.</string>
     <string name="downloads_clear_dialog_title">Clear completed downloads?</string>

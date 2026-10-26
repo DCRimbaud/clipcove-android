@@ -2,6 +2,22 @@
 
 All notable changes to ClipCove are documented here.
 
+## [1.4.0] - 2026-10-26
+
+### Added
+
+- Queue-wide pause, resume, and retry-failed actions for multi-file downloads.
+- Aggregate foreground notification progress for downloads that run in parallel.
+- Unit coverage for queue-state counts and weighted aggregate progress.
+
+### Fixed
+
+- Failed download tasks now retry correctly without requiring an app restart.
+
+### Changed
+
+- Version name set to `1.4.0` (`versionCode` 25).
+
 ## [1.3.1] - 2026-10-26
 
 ### Added
