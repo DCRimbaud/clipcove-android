@@ -48,11 +48,24 @@ $env:PYTHON_EXE = "C:\path\to\python.exe"
 .\gradlew.bat lintDebug testDebugUnitTest assembleRelease
 ```
 
-Expected artifact:
+For debug-signed test releases with smaller ABI-specific packages:
+
+```powershell
+.\gradlew.bat assembleStagingRelease -PclipcoveAbis=arm64-v8a
+.\gradlew.bat assembleStagingRelease -PclipcoveAbis=x86_64
+```
+
+Expected production artifact:
 
 ```text
 app/build/outputs/apk/release/app-release.apk
 ```
+
+The debug-signed test variants are written to `app/build/outputs/apk/stagingRelease/`.
+
+## Gitee Mirror
+
+The Gitee repository is a read-only mirror. GitHub remains canonical. Release assets mirrored under the `release-assets` branch must keep the exact GitHub asset names so `UpdateDownloadRoutes` can map both APK and checksum URLs safely.
 
 Verify the signature:
 

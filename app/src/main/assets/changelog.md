@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.1
+
+- Added a Gitee mirror download route for faster downloads in mainland China.
+- Update downloads now select routes by measured transfer speed rather than first-byte latency.
+- Added smaller ABI-specific test packages and matching checksum selection.
+
 ## 1.3.0
 
 - Douyin and Xiaohongshu results now include full captions, creator handles, topics, locations, play/recommend counters, soundtrack authors, and cover images.

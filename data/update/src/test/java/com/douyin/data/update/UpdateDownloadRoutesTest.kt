@@ -8,6 +8,8 @@
 package com.douyin.data.update
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 /** Protects update route allowlisting and direct-only behavior. */
@@ -48,6 +50,50 @@ class UpdateDownloadRoutesTest {
         assertEquals(apiUrl, routes.first())
         assertEquals(apiUrl, routes[1].removePrefix("https://gh-proxy.com/"))
         assertEquals(apiUrl, routes[2].removePrefix("https://gh.idayer.com/"))
+    }
+
+    /** Ensures small checksum files use the public Gitee raw route. */
+    @Test
+    fun `checksum uses Gitee mirror`() {
+        val checksumUrl = "$githubUrl.sha256"
+        val routes = UpdateDownloadRoutes.candidates(checksumUrl, true)
+
+        assertEquals(9, routes.size)
+        assertEquals(
+            "https://gitee.com/a917947622/clipcove-android/raw/release-assets/v1.0.0/app.apk.sha256",
+            routes[1],
+        )
+    }
+
+    /** Ensures APK downloads use a chunk manifest rather than a login-gated raw APK. */
+    @Test
+    fun `APK maps to chunk manifest`() {
+        assertEquals(
+            "https://gitee.com/a917947622/clipcove-android/raw/release-assets/v1.0.0/app.apk.parts.json",
+            UpdateDownloadRoutes.giteeChunkManifest(githubUrl),
+        )
+    }
+
+    /** Ensures chunk URLs stay beneath the approved manifest directory. */
+    @Test
+    fun `chunk URL rejects path traversal`() {
+        val manifest =
+            "https://gitee.com/a917947622/clipcove-android/raw/release-assets/v1.0.0/app.apk.parts.json"
+
+        assertEquals(
+            "https://gitee.com/a917947622/clipcove-android/raw/release-assets/v1.0.0/app.apk.part000",
+            UpdateDownloadRoutes.giteeChunkUrl(manifest, "app.apk.part000"),
+        )
+        assertNull(UpdateDownloadRoutes.giteeChunkUrl(manifest, "../secret"))
+    }
+
+    /** Ensures other GitHub projects never receive the ClipCove Gitee mirror route. */
+    @Test
+    fun `other GitHub repositories do not use ClipCove mirror`() {
+        val other = "https://github.com/example/another/releases/download/v1.0.0/app.apk"
+        val routes = UpdateDownloadRoutes.candidates(other, true)
+
+        assertFalse(routes.any { it.contains("gitee.com/a917947622") })
     }
 
     /** Ensures arbitrary download hosts cannot receive GitHub proxy prefixes. */
