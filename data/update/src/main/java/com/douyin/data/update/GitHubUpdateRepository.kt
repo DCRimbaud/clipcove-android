@@ -13,25 +13,34 @@ class GitHubUpdateRepository(
     private val client: OkHttpClient = defaultClient(),
 ) : UpdateRepository {
 
-    override suspend fun getReleases(): List<AppRelease> = withContext(Dispatchers.IO) {
-        val request = Request.Builder()
-            .url(RELEASES_URL)
-            .header("Accept", "application/vnd.github+json")
-            .header("X-GitHub-Api-Version", "2022-11-28")
-            .header("User-Agent", "ClipCove-Android")
-            .get()
-            .build()
+    override suspend fun getReleases(allowMirrors: Boolean): List<AppRelease> = withContext(Dispatchers.IO) {
+        var lastError: Exception? = null
+        for (url in UpdateDownloadRoutes.candidates(RELEASES_URL, allowMirrors)) {
+            try {
+                val request = Request.Builder()
+                    .url(url)
+                    .header("Accept", "application/vnd.github+json")
+                    .header("X-GitHub-Api-Version", "2022-11-28")
+                    .header("User-Agent", "ClipCove-Android")
+                    .get()
+                    .build()
 
-        client.newCall(request).execute().use { response ->
-            val body = response.body?.string().orEmpty()
-            if (response.code == 403 || response.code == 429) {
-                throw IOException("GitHub API rate limit reached; try again later")
+                client.newCall(request).execute().use { response ->
+                    val body = response.body?.string().orEmpty()
+                    if (response.code == 403 || response.code == 429) {
+                        throw IOException("GitHub API rate limit reached; try again later")
+                    }
+                    if (!response.isSuccessful) {
+                        throw IOException("GitHub API returned HTTP ${response.code}")
+                    }
+                    if (body.isBlank()) throw IOException("GitHub API returned an empty response")
+                    return@withContext parseReleases(body)
+                }
+            } catch (error: Exception) {
+                lastError = error
             }
-            if (!response.isSuccessful) {
-                throw IOException("GitHub API returned HTTP ${response.code}")
-            }
-            parseReleases(body)
         }
+        throw IOException("Unable to reach GitHub Releases", lastError)
     }
 
     private fun parseReleases(raw: String): List<AppRelease> {
@@ -83,9 +92,9 @@ class GitHubUpdateRepository(
         const val MAX_NOTES_LENGTH = 20_000
 
         fun defaultClient(): OkHttpClient = OkHttpClient.Builder()
-            .connectTimeout(10, TimeUnit.SECONDS)
-            .readTimeout(15, TimeUnit.SECONDS)
-            .callTimeout(20, TimeUnit.SECONDS)
+            .connectTimeout(6, TimeUnit.SECONDS)
+            .readTimeout(10, TimeUnit.SECONDS)
+            .callTimeout(15, TimeUnit.SECONDS)
             .build()
     }
 }

@@ -218,7 +218,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 icon = Icons.Filled.SystemUpdate,
                 tint = DyGreen,
                 title = "更新加速线路",
-                description = "GitHub 直连失败时自动尝试公共加速线路；安装包仍会校验签名和 SHA-256。",
+                description = "自动探测并切换 GitHub 加速线路；安装包仍会校验签名和 SHA-256。",
                 trailing = {
                     Switch(
                         checked = autoUpdateMirrors,
@@ -580,7 +580,7 @@ private fun updateActionTitle(state: UpdateUiState): String = when (state) {
     UpdateUiState.Checking -> "正在检查更新"
     UpdateUiState.UpToDate -> "已是最新版本"
     is UpdateUiState.Available -> "发现新版本 ${state.release.tagName}"
-    is UpdateUiState.Downloading -> "正在下载更新 ${state.progress}%"
+    is UpdateUiState.Downloading -> if (state.progress > 0) "正在下载更新 ${state.progress}%" else "正在选择更新线路"
     is UpdateUiState.PermissionRequired -> "需要安装权限"
     is UpdateUiState.InstallReady -> "安装器已打开"
     is UpdateUiState.Failed -> if (state.release != null) "更新失败，点按重试" else "重新检查更新"
@@ -593,10 +593,10 @@ private fun updateActionDescription(state: UpdateUiState, autoUpdateMirrors: Boo
     is UpdateUiState.Available -> {
         val size = state.release.apkSizeBytes()
         val sizeHint = if (size > 0) "（约 ${formatUpdateSize(size)}）" else ""
-        val routeHint = if (autoUpdateMirrors) "GitHub 直连失败时会自动切换加速线路。" else ""
+        val routeHint = if (autoUpdateMirrors) "会自动探测可用加速线路。" else ""
         "点按自动下载并校验 APK$sizeHint，随后打开系统安装器。建议连接 WiFi。$routeHint"
     }
-    is UpdateUiState.Downloading -> "正在应用内下载更新，请保持网络连接。"
+    is UpdateUiState.Downloading -> if (state.progress > 0) "正在应用内下载更新，请保持网络连接。" else "正在并发探测可用线路，找到后会立即开始下载。"
     is UpdateUiState.PermissionRequired -> "请在系统页面允许 ClipCove 安装未知应用，然后返回本页再次点按。"
     is UpdateUiState.InstallReady -> "请按系统安装页提示完成升级；页面关闭后可再次点按。"
     is UpdateUiState.Failed -> {

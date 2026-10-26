@@ -8,8 +8,12 @@ import android.net.Uri
 import android.os.Build
 import android.os.StatFs
 import android.provider.Settings
+import android.util.Log
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -28,6 +32,22 @@ class AndroidUpdateInstaller(
 ) : UpdateInstaller {
 
     private val appContext = context.applicationContext
+
+    private val probeClient by lazy {
+        client.newBuilder()
+            .connectTimeout(5, TimeUnit.SECONDS)
+            .readTimeout(7, TimeUnit.SECONDS)
+            .callTimeout(12, TimeUnit.SECONDS)
+            .build()
+    }
+
+    private val checksumClient by lazy {
+        client.newBuilder()
+            .connectTimeout(6, TimeUnit.SECONDS)
+            .readTimeout(10, TimeUnit.SECONDS)
+            .callTimeout(15, TimeUnit.SECONDS)
+            .build()
+    }
 
     override suspend fun downloadAndInstall(
         release: AppRelease,
@@ -118,7 +138,7 @@ class AndroidUpdateInstaller(
                     .header("User-Agent", USER_AGENT)
                     .get()
                     .build()
-                client.newCall(request).execute().use { response ->
+                checksumClient.newCall(request).execute().use { response ->
                     if (!response.isSuccessful) throw HttpStatusException(response.code)
                     val text = response.body?.string().orEmpty()
                     return UpdatePackageVerifier.parseExpectedSha256(text)
@@ -138,7 +158,8 @@ class AndroidUpdateInstaller(
         onProgress: (Int) -> Unit,
     ) {
         var lastError: Exception? = null
-        for (url in UpdateDownloadRoutes.candidates(asset.downloadUrl, allowMirrors)) {
+        val routes = orderRoutes(UpdateDownloadRoutes.candidates(asset.downloadUrl, allowMirrors))
+        for (url in routes) {
             var attempt = 0
             while (attempt <= MAX_RETRIES_PER_SOURCE) {
                 try {
@@ -153,9 +174,59 @@ class AndroidUpdateInstaller(
             }
         }
         throw UpdateException(
-            "所有下载线路均失败，请检查网络或打开 GitHub 发布页手动下载"
+            "所有下载线路均失败，请切换网络后重试，或在设置中开启更新加速线路"
         ).also { error -> lastError?.let(error::initCause) }
     }
+
+    private suspend fun orderRoutes(routes: List<String>): List<String> {
+        if (routes.size <= 1) return routes
+
+        val probes = coroutineScope {
+            routes.map { route ->
+                async(Dispatchers.IO) { probeRoute(route) }
+            }.awaitAll()
+        }
+        val reachable = probes.filter { it.reachable }.sortedBy { it.elapsedMs }
+        val unreachable = probes.filterNot { it.reachable }
+        val ordered = (reachable + unreachable).map { it.url }
+        Log.d(TAG, "update routes: " + probes.joinToString { "${it.url.substringAfter("://").substringBefore('/')}:${if (it.reachable) "${it.elapsedMs}ms" else "offline"}" })
+        return ordered
+    }
+
+    private fun probeRoute(url: String): ProbeResult {
+        val startedAt = System.nanoTime()
+        return try {
+            val request = Request.Builder()
+                .url(url)
+                .header("User-Agent", USER_AGENT)
+                .header("Range", "bytes=0-32767")
+                .get()
+                .build()
+            probeClient.newCall(request).execute().use { response ->
+                val body = response.body
+                val readable = response.isSuccessful && body != null && body.byteStream().use { input ->
+                    input.read(ByteArray(PROBE_BYTES)) > 0
+                }
+                ProbeResult(
+                    url = url,
+                    reachable = readable,
+                    elapsedMs = (System.nanoTime() - startedAt) / 1_000_000,
+                )
+            }
+        } catch (error: Exception) {
+            ProbeResult(
+                url = url,
+                reachable = false,
+                elapsedMs = (System.nanoTime() - startedAt) / 1_000_000,
+            )
+        }
+    }
+
+    private data class ProbeResult(
+        val url: String,
+        val reachable: Boolean,
+        val elapsedMs: Long,
+    )
 
     private fun downloadAttempt(
         asset: ReleaseAsset,
@@ -332,6 +403,8 @@ class AndroidUpdateInstaller(
 
     private companion object {
         const val MAX_RETRIES_PER_SOURCE = 1
+        const val PROBE_BYTES = 32 * 1024
+        const val TAG = "ClipCoveUpdate"
         const val USER_AGENT = "ClipCove-Android-Updater"
 
         fun defaultClient(): OkHttpClient = OkHttpClient.Builder()

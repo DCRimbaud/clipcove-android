@@ -2,6 +2,19 @@
 
 All notable changes to ClipCove are documented here.
 
+## [1.2.1] - 2026-10-26
+
+### Fixed
+
+- Update checks and APK downloads now fall back through dedicated GitHub API proxies and multiple release-asset mirrors when direct GitHub access is unavailable.
+- Update routes are probed concurrently with short timeouts, so a reachable but stalled direct connection cannot block the whole download.
+
+### Changed
+
+- Added verified fallback routes including `gh.llkk.cc`, `gh.ddlc.top`, `gh.monlor.com`, and `gh.idayer.com`.
+- Update progress now shows when ClipCove is selecting a route instead of waiting at 0%.
+- Version name set to `1.2.1` (`versionCode` 22).
+
 ## [1.2.0] - 2026-10-26
 
 ### Added

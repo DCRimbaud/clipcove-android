@@ -139,7 +139,10 @@ class SettingsViewModel(
         _updateState.value = UpdateUiState.Checking
         viewModelScope.launch {
             _updateState.value = try {
-                val latest = ReleaseSelector.newest(updateRepository.getReleases(), versionName)
+                val latest = ReleaseSelector.newest(
+                    updateRepository.getReleases(settingsRepo.autoUpdateMirrors.value),
+                    versionName,
+                )
                 if (latest == null) UpdateUiState.UpToDate else UpdateUiState.Available(latest)
             } catch (e: Exception) {
                 UpdateUiState.Failed(e.message ?: "检查更新失败，请稍后重试")
