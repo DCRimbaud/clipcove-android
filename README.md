@@ -32,6 +32,11 @@ ClipCove is a local-first Android media downloader for **Douyin** and **Xiaohong
 - Refined dark Jetpack Compose UI with restrained motion, press feedback, and animated progress states
 - Android 7.0+ support (minSdk 24)
 
+## Download Mirrors
+
+- [GitHub Releases](https://github.com/DCRimbaud/clipcove-android/releases) is the canonical source for source code, releases, security advisories, and issue tracking.
+- [Gitee mirror](https://gitee.com/a917947622/clipcove-android) is a read-only mirror for users in mainland China. It is not the source of truth; mirror lag or missing assets may occur.
+
 ## Tech Stack
 
 - Kotlin, Jetpack Compose, Material 3
