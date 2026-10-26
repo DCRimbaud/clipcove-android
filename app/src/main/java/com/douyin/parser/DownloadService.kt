@@ -20,6 +20,7 @@ import androidx.core.app.NotificationCompat
 import com.douyin.core.uiresources.R as SharedR
 import com.douyin.data.download.DownloadRepository
 import com.douyin.data.download.DownloadStatus
+import com.douyin.data.download.toDownloadQueueSummary
 import com.douyin.data.settings.withAppLanguage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -59,16 +60,26 @@ class DownloadService : Service() {
         collectJob ?: run {
             collectJob = scope.launch {
                 downloadRepo.tasks.collectLatest { tasks ->
-                    val active = tasks.filter {
+                    val activeTasks = tasks.filter {
                         it.status == DownloadStatus.DOWNLOADING || it.status == DownloadStatus.QUEUED
-                    }.maxByOrNull { it.id }
-                    if (active != null) {
-                        val text = if (active.status == DownloadStatus.DOWNLOADING) {
-                            "${active.title} ${active.progress}% · ${formatSpeed(active.speedBps)}"
+                    }
+                    if (activeTasks.isNotEmpty()) {
+                        val summary = tasks.toDownloadQueueSummary()
+                        val text = if (activeTasks.size == 1) {
+                            val active = activeTasks.single()
+                            if (active.status == DownloadStatus.DOWNLOADING) {
+                                "${active.title} ${active.progress}% · ${formatSpeed(active.speedBps)}"
+                            } else {
+                                getString(SharedR.string.notification_waiting, active.title)
+                            }
                         } else {
-                            getString(SharedR.string.notification_waiting, active.title)
+                            getString(
+                                SharedR.string.notification_queue_progress,
+                                activeTasks.size,
+                                summary.activeProgress,
+                            )
                         }
-                        updateNotification(text, active.progress, false)
+                        updateNotification(text, summary.activeProgress, false)
                     } else {
                         // No active work remains: leave the foreground state.
                         stopForeground(STOP_FOREGROUND_REMOVE)

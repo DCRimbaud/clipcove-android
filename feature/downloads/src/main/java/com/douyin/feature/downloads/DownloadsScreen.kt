@@ -95,6 +95,7 @@ import com.douyin.data.download.DownloadRepository
 import com.douyin.data.download.DownloadStatus
 import com.douyin.core.uiresources.R as SharedR
 import com.douyin.data.download.DownloadTask
+import com.douyin.data.download.toDownloadQueueSummary
 import java.io.File
 
 @Composable
@@ -113,6 +114,7 @@ fun DownloadsScreen(repository: DownloadRepository) {
     }
     val completedCount = tasks.count { it.status == DownloadStatus.DONE }
     val failedCount = tasks.count { it.status == DownloadStatus.FAILED }
+    val queueSummary = tasks.toDownloadQueueSummary()
     var query by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf(DownloadFilter.ALL) }
     var confirmClearCompleted by remember { mutableStateOf(false) }
@@ -215,6 +217,43 @@ fun DownloadsScreen(repository: DownloadRepository) {
                         modifier = Modifier.weight(1f),
                         onClick = { filter = option },
                     )
+                }
+            }
+            AnimatedVisibility(
+                visible = queueSummary.hasActive || queueSummary.hasPaused || queueSummary.hasFailed,
+                enter = fadeIn(tween(DyMotion.QuickMs)) +
+                    expandVertically(animationSpec = tween(DyMotion.QuickMs)),
+                exit = fadeOut(tween(DyMotion.QuickMs)) +
+                    shrinkVertically(animationSpec = tween(DyMotion.QuickMs)),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    if (queueSummary.hasActive) {
+                        QueueAction(
+                            text = stringResource(SharedR.string.downloads_pause_all),
+                            color = DyCyan,
+                            modifier = Modifier.weight(1f),
+                            onClick = repository::pauseAll,
+                        )
+                    }
+                    if (queueSummary.hasPaused) {
+                        QueueAction(
+                            text = stringResource(SharedR.string.downloads_resume_all),
+                            color = DyGreen,
+                            modifier = Modifier.weight(1f),
+                            onClick = repository::resumeAll,
+                        )
+                    }
+                    if (queueSummary.hasFailed) {
+                        QueueAction(
+                            text = stringResource(SharedR.string.downloads_retry_failed),
+                            color = DyRed,
+                            modifier = Modifier.weight(1f),
+                            onClick = repository::retryFailed,
+                        )
+                    }
                 }
             }
             AnimatedVisibility(
@@ -479,7 +518,7 @@ private fun DownloadActions(task: DownloadTask, repository: DownloadRepository, 
             }
             DownloadStatus.FAILED -> {
                 TaskAction(stringResource(SharedR.string.action_retry), DyCyan, Modifier.weight(1f)) {
-                    repository.resume(task)
+                    repository.retry(task)
                 }
                 TaskAction(stringResource(SharedR.string.action_delete), DyRed, Modifier.weight(1f)) {
                     repository.remove(task)
@@ -512,6 +551,22 @@ private fun DownloadActions(task: DownloadTask, repository: DownloadRepository, 
 private fun TaskAction(text: String, color: Color, modifier: Modifier = Modifier, onClick: () -> Unit) {
     TextButton(onClick = onClick, modifier = modifier, contentPadding = PaddingValues(horizontal = 2.dp, vertical = 2.dp)) {
         Text(text, color = color, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+    }
+}
+
+@Composable
+private fun QueueAction(
+    text: String,
+    color: Color,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    TextButton(
+        onClick = onClick,
+        modifier = modifier,
+        contentPadding = PaddingValues(horizontal = 2.dp, vertical = 4.dp),
+    ) {
+        Text(text, color = color, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 

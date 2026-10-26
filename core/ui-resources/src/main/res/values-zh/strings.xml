@@ -49,6 +49,7 @@
     <string name="notification_preparing">准备下载</string>
     <string name="notification_waiting">%1$s 等待中…</string>
     <string name="notification_progress">下载进度</string>
+    <string name="notification_queue_progress">%1$d 个任务进行中 · 总进度 %2$d%%</string>
 
     <string name="home_header_subtitle">留住喜欢，只存本机。</string>
     <string name="home_header_eyebrow">本地媒体 · 隐私优先</string>
@@ -167,6 +168,9 @@
     <string name="downloads_failed">失败</string>
     <string name="downloads_search_hint">搜索标题或文件名</string>
     <string name="downloads_clear_completed">清理已完成</string>
+    <string name="downloads_pause_all">全部暂停</string>
+    <string name="downloads_resume_all">全部继续</string>
+    <string name="downloads_retry_failed">重试失败任务</string>
     <string name="downloads_empty_category">当前分类没有下载任务</string>
     <string name="downloads_no_search_results">没有匹配“%1$s”的下载任务。</string>
     <string name="downloads_clear_dialog_title">清理已完成任务？</string>

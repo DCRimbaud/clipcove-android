@@ -164,13 +164,51 @@ class AndroidDownloadRepository : DownloadRepository {
     }
 
     override fun resume(task: DownloadTask) {
-        val t = liveTasks[task.id] ?: return
-        if (t.status != DownloadStatus.PAUSED) return
-        t.paused = false
-        t.retryCount = 0
-        t.status = DownloadStatus.QUEUED
-        update(t)
-        scope.launch { downloadLoop(t) }
+        relaunch(task, DownloadStatus.PAUSED)
+    }
+
+    override fun retry(task: DownloadTask) {
+        relaunch(task, DownloadStatus.FAILED)
+    }
+
+    override fun pauseAll() {
+        _tasks.value
+            .filter { it.status == DownloadStatus.QUEUED || it.status == DownloadStatus.DOWNLOADING }
+            .forEach(::pause)
+    }
+
+    override fun resumeAll() {
+        _tasks.value
+            .filter { it.status == DownloadStatus.PAUSED }
+            .forEach(::resume)
+    }
+
+    override fun retryFailed() {
+        _tasks.value
+            .filter { it.status == DownloadStatus.FAILED }
+            .forEach(::retry)
+    }
+
+    /**
+     * Re-enters a paused or failed task into the state machine.
+     *
+     * Failed workers are normally removed from `liveTasks`, so a defensive copy
+     * is registered before launching a new worker. The expected source status
+     * makes repeated taps idempotent and prevents duplicate workers.
+     */
+    private fun relaunch(task: DownloadTask, expectedStatus: DownloadStatus) {
+        val live = liveTasks[task.id]
+        val owned = live ?: task.copy().also { liveTasks[it.id] = it }
+        if (owned.status != expectedStatus) return
+
+        owned.cancelled = false
+        owned.paused = false
+        owned.speedBps = 0
+        owned.retryCount = 0
+        owned.status = DownloadStatus.QUEUED
+        update(owned)
+        persist()
+        scope.launch { downloadLoop(owned) }
     }
 
     override fun remove(task: DownloadTask) {
@@ -231,8 +269,11 @@ class AndroidDownloadRepository : DownloadRepository {
                 }
             }
         } finally {
-            // Remove completed, failed, and cancelled workers from the live map; retain paused workers for resume.
-            if (task.status != DownloadStatus.PAUSED && liveTasks[task.id] === task) {
+            // Retain paused workers for resume and queued workers that were relaunched from a finishing worker.
+            if (task.status != DownloadStatus.PAUSED &&
+                task.status != DownloadStatus.QUEUED &&
+                liveTasks[task.id] === task
+            ) {
                 liveTasks.remove(task.id)
             }
             persist()
