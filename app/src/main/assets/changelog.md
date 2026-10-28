@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.1
+
+- Xiaohongshu gallery images and covers now use the clean official image source instead of the watermarked H5 preview.
+- Added a safe fallback when the image source identifier is missing or malformed.
 ## 1.4.0
 
 - Added queue-wide pause, resume, and retry-failed controls for batch downloads.

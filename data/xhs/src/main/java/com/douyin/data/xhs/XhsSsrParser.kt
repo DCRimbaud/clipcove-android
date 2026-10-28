@@ -176,7 +176,9 @@ object XhsSsrParser {
             streamCandidates
         }
         val videoUrl = candidates.firstOrNull()?.url.orEmpty()
-        val firstImageUrl = secureUrl(images?.optJSONObject(0).bestImageUrl().orEmpty())
+        val firstImage = images?.optJSONObject(0)
+        val firstImageUrl = firstImage?.originalImageUrl().orEmpty()
+            .ifBlank { secureUrl(firstImage.bestImageUrl().orEmpty()) }
         val videoCover = secureUrl(
             video?.optJSONObject("cover")
                 ?.optJSONArray("urlList")
@@ -373,13 +375,32 @@ object XhsSsrParser {
                 add(
                     MediaImage(
                         url = secureUrl(url),
-                        originalUrl = secureUrl(item.optString("originalImageUrl")),
+                        originalUrl = item.originalImageUrl(),
                         width = item.optInt("width").coerceAtLeast(0),
                         height = item.optInt("height").coerceAtLeast(0),
                     )
                 )
             }
         }
+    }
+
+    /**
+     * Resolves the clean image source for a gallery item.
+     *
+     * Xiaohongshu's mobile H5 variants embed a platform watermark. When no
+     * explicit original is supplied, the stable `fileId` still maps to the
+     * platform's clean image CDN. The format transform keeps `.jpg` filenames
+     * accurate even when the stored original is a PNG.
+     */
+    private fun JSONObject.originalImageUrl(): String {
+        val explicit = secureUrl(optString("originalImageUrl"))
+        if (explicit.isNotBlank()) return explicit
+
+        val fileId = optString("fileId").trim().trimStart('/')
+        if (!CLEAN_IMAGE_FILE_ID.matches(fileId) || fileId.split('/').any { it == ".." }) {
+            return ""
+        }
+        return "https://sns-img-bd.xhscdn.com/$fileId?imageView2/2/format/jpg"
     }
 
     private fun JSONObject?.bestImageUrl(): String {
@@ -449,4 +470,6 @@ object XhsSsrParser {
 
     private fun secureUrl(url: String): String =
         if (url.startsWith("http://")) "https://" + url.removePrefix("http://") else url
+
+    private val CLEAN_IMAGE_FILE_ID = Regex("""[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*""")
 }

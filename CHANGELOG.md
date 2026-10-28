@@ -2,6 +2,17 @@
 
 All notable changes to ClipCove are documented here.
 
+## [1.4.1] - 2026-10-29
+
+### Fixed
+
+- Xiaohongshu image notes now derive the clean image source from the official `fileId` CDN value instead of downloading the watermarked H5 preview.
+- Xiaohongshu result covers now prefer the same clean image source when available.
+- Unsafe or malformed image file identifiers fall back to the validated platform URL.
+
+### Changed
+
+- Version name set to `1.4.1` (`versionCode` 26).
 ## [1.4.0] - 2026-10-26
 
 ### Added
