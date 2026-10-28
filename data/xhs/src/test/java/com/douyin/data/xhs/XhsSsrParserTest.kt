@@ -143,6 +143,58 @@ class XhsSsrParserTest {
         assertTrue(media.hasImages)
     }
 
+    /**
+     * Ensures watermarked mobile image variants are replaced by the clean
+     * file-id CDN source, including the cover used by the result card.
+     */
+    @Test
+    fun `derives clean image source from file id`() {
+        val note = JSONObject()
+            .put("noteId", NOTE_ID)
+            .put("title", "无水印图文")
+            .put("type", "normal")
+            .put("user", JSONObject().put("nickname", "作者"))
+            .put(
+                "imageList",
+                JSONArray().put(
+                    JSONObject()
+                        .put("fileId", "notes_pre_post/clean-image-id")
+                        .put("url", "https://sns-webpic-qc.xhscdn.com/watermarked.jpg")
+                        .put("width", 504)
+                        .put("height", 490)
+                )
+            )
+
+        val result = XhsSsrParser.parse(html(stateFor(note)), sourceUrl())
+
+        val media = (result as ParseResult.Success).media
+        val expected = "https://sns-img-bd.xhscdn.com/notes_pre_post/clean-image-id?imageView2/2/format/jpg"
+        assertEquals(expected, media.images.single().preferredUrl)
+        assertEquals(expected, media.coverUrl)
+    }
+
+    /** Ensures malformed file identifiers cannot escape the clean image CDN path. */
+    @Test
+    fun `rejects unsafe image file id`() {
+        val note = JSONObject()
+            .put("noteId", NOTE_ID)
+            .put("title", "安全回退")
+            .put("type", "normal")
+            .put("user", JSONObject().put("nickname", "作者"))
+            .put(
+                "imageList",
+                JSONArray().put(
+                    JSONObject()
+                        .put("fileId", "../../private")
+                        .put("urlDefault", "https://sns-webpic-qc.xhscdn.com/fallback.jpg")
+                )
+            )
+
+        val media = (XhsSsrParser.parse(html(stateFor(note)), sourceUrl()) as ParseResult.Success).media
+
+        assertEquals("https://sns-webpic-qc.xhscdn.com/fallback.jpg", media.images.single().preferredUrl)
+    }
+
     /** Ensures CDN media URLs are upgraded to HTTPS before reaching the downloader. */
     @Test
     fun `upgrades insecure CDN URLs to HTTPS`() {
@@ -178,7 +230,7 @@ class XhsSsrParserTest {
         val media = (XhsSsrParser.parse(html(stateFor(note)), sourceUrl()) as ParseResult.Success).media
 
         assertEquals("https://example.com/video.mp4", media.videoUrl)
-        assertEquals("https://example.com/cover.jpg", media.coverUrl)
+        assertEquals("https://example.com/original.jpg", media.coverUrl)
         assertEquals("https://example.com/original.jpg", media.images.single().preferredUrl)
     }
 

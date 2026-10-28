@@ -9,10 +9,10 @@ plugins {
 // Stable releases use 1.x.x; reserve 2.x.x for a major architecture change.
 val versionMajor = 1
 val versionMinor = 4
-val versionPatch = 0
+val versionPatch = 1
 val versionSuffix = ""
 val appVersionName = "$versionMajor.$versionMinor.$versionPatch$versionSuffix"
-val appVersionCode = 25
+val appVersionCode = 26
 val requestedAbis = providers.gradleProperty("clipcoveAbis")
     .orNull
     ?.split(',')
